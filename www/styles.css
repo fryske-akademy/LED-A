@@ -1,0 +1,66 @@
+@media (min-width: 768px) {
+    .navbar-default > .container-fluid {   
+        display: flex;
+        justify-content: center;
+    }
+}
+
+#navBar {
+    font-size: 16px;
+}
+
+.navbar {
+    border-top: 1px solid #dedede;
+    border-bottom: 1px solid #dedede;
+}
+
+.btn-group { 
+    margin-left: 20px;
+    margin-right: 20px;
+}
+
+.format {
+    max-width: 650px;
+    margin-left: 20px;
+    margin-right: 20px;
+}
+
+.web {
+    width: 100%;
+    display: inline-block;
+    padding: 6px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+.modal-dialog {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) !important;
+}
+
+.shinysky-busy-indicator {
+    width: 20%;
+    z-index: 1000;
+}
+
+.dlButton {
+    width: 275px;
+    margin-left: 13px;
+    text-align: left;
+}
+
+#heartbeat {
+    width: 23%;
+    visibility: hidden;
+}
+
+.info.legend.leaflet-control {
+  text-align: left;
+}
+
+.info.legend.leaflet-control i {
+  float: left;
+}
