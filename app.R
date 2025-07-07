@@ -96,7 +96,20 @@ ui <- tagList(
                    Shiny.onInputChange("winWidth" , window.innerWidth);
                    Shiny.onInputChange("winHeight", window.innerHeight);
                  });
-               ')    
+               '),
+    
+    tags$script("(function()
+                 {
+                   if (performance.navigation.type === 1 || performance.getEntriesByType('navigation')[0].type === 'reload') 
+                   {
+                     history.replaceState(null, '', window.location.pathname);
+                   }
+                   document.addEventListener('shiny:sessioninitialized', function() 
+                   {
+                     Shiny.setInputValue('refresh_detected', true, {priority: 'event'});
+                   });
+                 })();
+               ")
   ),
 
   navbarPage
@@ -440,7 +453,7 @@ ui <- tagList(
             
             bsButton("butSelOutput1", label = NULL, icon = icon("info"), size = "extra-small"),
             bsModal ("modSelOutput1", "Output", "butSelOutput1", size = "large", "Dit is de helptekst"),
-                     
+
             HTML("<span style='font-weight: bold;'>&nbsp;Output:</span>"),
             p(style='height: 8px')
           ),
@@ -533,21 +546,21 @@ ui <- tagList(
               inline       = FALSE
             )
           ),
-            
+
           ### Upload table with coordinates
-            
+
           br(),
-            
+
           fluidPage(
             style = "margin-left: 120px",
-              
+
             bsButton("butGeoTab2", label = NULL, icon = icon("info"), size = "extra-small"),
             bsModal ("modGeoTab2", "Upload table with coordinates", "butGeoTab2", size = "large", "Dit is de helptekst"),
-              
+
             HTML("<span style='font-weight: bold;'>&nbsp;Upload table with coordinates (optional):</span>"),
             p(style='height: 8px')
           ),
-            
+
           uiOutput('geoTab2'),
 
           fluidPage(
@@ -626,7 +639,7 @@ ui <- tagList(
           br(),
           
           ### Output
-            
+
           fluidPage(
             style = "margin-left: 120px",
               
@@ -657,7 +670,7 @@ ui <- tagList(
         br()
       )
     ),
-      
+
     tabPanel
     (
       title = HTML("<span class='glyphicon glyphicon-unchecked' style='font-size: 100%'></span>&nbsp;Distance table"),
@@ -995,9 +1008,9 @@ ui <- tagList(
           div(style='height: 12px'),
           div(style='margin-left: 60px', radioButtons('replyMethod6',
                                                       NULL,
-                                                      c("Dynamic tree cut", "Bootstrap", "Noise", "Affinity propagation", "HDBSCAN"),
-                                                      selected = "Dynamic tree cut",
-                                                      inline = FALSE)),
+                                                      choices  = character(0),
+                                                      selected = character(0),
+                                                      inline   = FALSE)),
 
           br(),
 
@@ -1484,7 +1497,7 @@ ui <- tagList(
           tags$div(tags$ul
           (
             tags$li(tags$div(style="padding: 5px;", "The installer provided on this page has been tested under Windows 10.")),
-            tags$li(tags$div(style="padding: 5px;", "Click", a(strong("here"), href="standalone/Install LED-A.exe", target = "_blank"), "in order to download the installer.")),
+            tags$li(tags$div(style="padding: 5px;", "Click", a(strong("here"), href="https://frisian.eu/Install%20LED-A.exe", target = "_blank"), "in order to download the installer.")),
             tags$li(tags$div(style="padding: 5px;", "Save the installer file in the Downloads or Desktop folder and double-click on it. Then follow the installation procedure.")),
             tags$li(tags$div(style="padding: 5px;", "Under", strong('Select Destination Location'), "click on", strong('Next'), ".")),
             tags$li(tags$div(style="padding: 5px;", "Under", strong('Select Additional Tasks'), "check", strong('Create a desktop shortcut'), "(important!)")),
@@ -1512,10 +1525,10 @@ ui <- tagList(
         br()
       )
     )),
-    
+
     br()
   ),
-    
+
   tags$footer
   (
     tags$table(
@@ -1557,6 +1570,54 @@ server <- function(input, output, session)
         warning("Failed to delete temp dir: ", conditionMessage(e))
     )
   })
+
+  ##############################################################################
+  
+  onSessionStart = isolate(
+  {
+    users$count <- users$count + 1
+  })
+  
+  onSessionEnded(function() 
+  {
+    isolate(
+    {
+      users$count <- users$count - 1
+    })
+  })
+  
+  observeEvent(users$count,
+    showNotification(paste0("Currently ", users$count, " user(s) connected."), type = "message", duration = 5)
+  )
+  
+  ##############################################################################
+	
+  observeEvent(input$navBar,
+  {
+    if (getUrlHash() == paste0("#", input$navBar)) return()
+    updateQueryString(paste0("#", input$navBar), mode = "push")
+  })
+
+  observeEvent(getUrlHash(),
+  {
+    Hash <- getUrlHash()
+    if (Hash == paste0("#", input$navBar)) return()
+    Hash <- gsub("#", "", Hash)
+    updateNavbarPage(session, "navBar", selected=Hash)
+  })
+
+  observeEvent(input$refresh_detected, 
+  {
+    updateNavbarPage(session, "navBar", selected="transcriptions")
+  })
+
+  output$heartbeat <- renderText(
+  {
+    invalidateLater(5000)
+    Sys.time()
+  })
+  
+  ##############################################################################
 
   global <- reactiveValues(
     dataType         = "transcriptions",
@@ -1621,47 +1682,6 @@ server <- function(input, output, session)
     posLegend        = "br",
     selCophenetic    = FALSE,
     partition        = NULL
-  )
-
-  ##############################################################################
-	
-  observeEvent(input$navBar,
-  {
-    if (getUrlHash() == paste0("#", input$navBar)) return()
-    updateQueryString(paste0("#", input$navBar), mode = "push")
-  })
-
-  observeEvent(getUrlHash(),
-  {
-    Hash <- getUrlHash()
-    if (Hash == paste0("#", input$navBar)) return()
-    Hash <- gsub("#", "", Hash)
-    updateNavbarPage(session, "navBar", selected=Hash)
-  })
-
-  output$heartbeat <- renderText(
-  {
-    invalidateLater(5000)
-    Sys.time()
-  })
-
-  ##############################################################################
-  
-  onSessionStart = isolate(
-  {
-    users$count <- users$count + 1
-  })
-  
-  onSessionEnded(function() 
-  {
-    isolate(
-    {
-      users$count <- users$count - 1
-    })
-  })
-  
-  observeEvent(users$count,
-    showNotification(paste0("Currently ", users$count, " user(s) connected."), type = "message", duration = 5)
   )
 
   ##############################################################################
@@ -2043,7 +2063,7 @@ server <- function(input, output, session)
       showNotification(paste(nr-NR, "items not found or found in only one variety were removed,", NR, "items are left over."), type = "message", duration = NULL)
 
     # preprocess transcriptions
-    
+
     global$idNot <- showNotification("Preprocessing transcriptions...", type = "message", duration = NULL)
 
     if (input$segmDist=="binary item comparison")
@@ -2162,7 +2182,7 @@ server <- function(input, output, session)
     # write files.txt
     write_tsv(as.data.frame(fileName[2:ncol(dt)]),
               file = paste0(tempDir, "files.txt"), col_names = F)
-    
+
     # write items.txt
     write_tsv(data.frame(dt[,1]),
               file = paste0(tempDir, "items.txt"), col_names = F)
@@ -2939,7 +2959,7 @@ server <- function(input, output, session)
       global$geoTab1 <- input$geoTab1
     }
     else
-             
+
     if ((!is.null(global$geoTab2)) && (global$dataType=="postaggeddata"))
     {
       global$geoTab2 <- NULL
@@ -2963,7 +2983,7 @@ server <- function(input, output, session)
       inFile <- global$geoTab
     }
     else
-      
+
     if (global$dataType=="acousticdata")
     {
       req(global$geoTab1)
@@ -3465,7 +3485,7 @@ server <- function(input, output, session)
         
       bsButton("butDownloads1", label = NULL, icon = icon("info"), size = "extra-small"),
       bsModal ("modDownloads1", "Output", "butDownloads1", size = "large", "Dit is de helptekst"),
-      
+
       HTML("<span style='font-weight: bold;'>&nbsp;Downloads:</span>"),
       p(style='height: 8px')
     )
@@ -3482,7 +3502,7 @@ server <- function(input, output, session)
   })  
   
   ##############################################################################
-  
+
   output$geoTab2 <- renderUI(
   {
     input$dataTab2
@@ -3775,14 +3795,14 @@ server <- function(input, output, session)
     if (input$selGrams=="5-gram")
       return(process5(uposAll, df, variety, frqFile))
   }
-  
+
   calcDist2 <- function(varieties)
   {
     indFile <- paste0(tempDir, "individual.tsv")
     writeLines("var1\tvar2\titem\tdist", con = indFile)
 
     frqFile <- paste0(tempDir, "frequencies.tsv")
-    
+
     selGrams <- as.numeric(substr(input$selGrams, 1,1))
     header   <- "var\tpos"
     
@@ -3794,7 +3814,7 @@ server <- function(input, output, session)
       header <- paste0(header, "\tpos")
     if (selGrams >= 5)
       header <- paste0(header, "\tpos")
-   
+
     writeLines(paste0(header, "\tfreq"), con = frqFile)  
 
     uposAll <- all.upos(varieties)
@@ -3804,10 +3824,10 @@ server <- function(input, output, session)
     nn <- (length(varieties) * (length(varieties)-1))/2
     
     freq1 <- process0(uposAll, read.upos(varieties[1]), varieties[1], frqFile) 
-    
+
     for (i in 2:length(varieties))
     {
-      freq1 <- process0(uposAll, read.upos(varieties[i]), varieties[i], frqFile) 
+      freq1 <- process0(uposAll, read.upos(varieties[i]), varieties[i], frqFile)
       
       for (j in 1:(i-1))
       {
@@ -3952,9 +3972,9 @@ server <- function(input, output, session)
 
     return(tl)
   })  
-  
+
   ##############################################################################
-  
+
   output$geoTab8 <- renderUI(
   {
     input$dataTab8
@@ -4294,34 +4314,30 @@ server <- function(input, output, session)
 
   clusObj3 <- reactive(
   {
-    if (length(input$replyMethod31)==0)
-      method <- "average"
-    else
-      
-    if (input$replyMethod31==  "Single-Linkage")
+    if (global$replyMethod31==  "Single-Linkage")
       method <- "single"
     else
       
-    if (input$replyMethod31=="Complete-Linkage")
+    if (global$replyMethod31=="Complete-Linkage")
       method <- "complete"
     else
       
-    if (input$replyMethod31=="UPGMA")
+    if (global$replyMethod31=="UPGMA")
       method <- "average"
     else
       
-    if (input$replyMethod31=="WPGMA")
+    if (global$replyMethod31=="WPGMA")
       method <- "mcquitty"
     else
       
-    if (input$replyMethod31=="Ward's")
+    if (global$replyMethod31=="Ward's")
       method <- "ward.D2"
     else {}
     
     clus <- hclust(aggrMatDist(), method=method)
 
     explVar <- formatC(x=round2((cor(aggrMatDist(), cophenetic(clus))^2)*100, n=1), digits = 1, format = "f")
-    contentOfMessage <- paste0("Variance explained by ", input$replyMethod31, " clustering: ", explVar, "%.")
+    contentOfMessage <- paste0("Variance explained by ", global$replyMethod31, " clustering: ", explVar, "%.")
     showNotification(contentOfMessage, type = "message", duration = NULL)
 
     return(clus)
@@ -4393,7 +4409,7 @@ server <- function(input, output, session)
     })
   }
 
-  multObj3 <- reactive(
+  multObj32 <- reactive(
   {
     req(nrow(aggrMatDist())>3)
     
@@ -4426,6 +4442,59 @@ server <- function(input, output, session)
     {
       explVar <- formatC(x=round2((cor(aggrMatDist(), mdsDist(coords))^2)*100, n=1), digits = 1, format = "f")
       contentOfMessage <- paste0("Variance explained by ", input$replyMethod32, " 2D MDS: ", explVar, "%.")
+      showNotification(contentOfMessage, type = "message", duration = NULL)
+      return(coords)      
+    }
+  })
+
+  multObj33 <- reactive(
+  {
+    req(nrow(aggrMatDist())>3)
+    
+    if (global$replyMethod32=="Classical")
+    {
+      if (!global$selCophenetic)
+        fit <- cmdscale(aggrMatDist(), eig=TRUE, k=3)
+      else
+        fit <- cmdscale(cophMatDist(), eig=TRUE, k=3)
+      
+      coords <- as.data.frame(fit$points)
+    }
+
+    if (global$replyMethod32=="Kruskal's")
+    {
+      if (!global$selCophenetic)
+        fit <- isoMDS(aggrMatDist(), k=3)
+      else
+        fit <- isoMDS(cophMatDist(), k=3)
+        
+      coords <- as.data.frame(fit$points)
+    }
+
+    if (global$replyMethod32=="Sammon's")
+    {
+      if (!global$selCophenetic)
+        fit <- sammonMDS(aggrMatDist(), k=3)
+      else
+        fit <- sammonMDS(cophMatDist(), k=3)
+      
+      coords <- as.data.frame(fit$points)
+    }
+
+    if (global$replyMethod32=="t-SNE")
+    {
+      if (!global$selCophenetic)
+        fit <- Rtsne(aggrMatDist(), check_duplicates=FALSE, pca=TRUE, perplexity=getPerplexity(), theta=0.5, dims=3)
+      else
+        fit <- Rtsne(cophMatDist(), check_duplicates=FALSE, pca=TRUE, perplexity=getPerplexity(), theta=0.5, dims=3)
+      
+      coords <- as.data.frame(fit$Y)
+    }
+
+    if (!is.null(fit))
+    {
+      explVar <- formatC(x=round2((cor(aggrMatDist(), mdsDist(coords))^2)*100, n=1), digits = 1, format = "f")
+      contentOfMessage <- paste0("Variance explained by ", global$replyMethod32, " 3D MDS: ", explVar, "%.")
       showNotification(contentOfMessage, type = "message", duration = NULL)
       return(coords)      
     }
@@ -4978,8 +5047,8 @@ server <- function(input, output, session)
   {
     req(input$nColGroups)
 
-    if (length(multObj3()) >0)
-      coords <- multObj3()
+    if (length(multObj32()) >0)
+      coords <- multObj32()
     else
       return(NULL)
 
@@ -5059,8 +5128,8 @@ server <- function(input, output, session)
   {
     req(input$nColGroups)
 
-    if (length(multObj5()) >0)
-      coords <- multObj5()
+    if (length(multObj33()) >0)
+      coords <- multObj33()
     else
       return(NULL)
 
@@ -5650,7 +5719,7 @@ server <- function(input, output, session)
   {
     global$selCophenetic <- input$selCophenetic
   })
-  
+
   beamGeo5 <- reactive(
   {
     req((input$navBar == "maps") & (input$selClass5 == "Beam map"))
@@ -5776,104 +5845,19 @@ server <- function(input, output, session)
     return(df)
   })
 
-  clusObj5 <- reactive(
+  cophMatDist <- eventReactive(clusObj3(),
   {
-    if (length(input$replyMethod31)==0)
-      method <- "average"
-    else
-      
-    if (input$replyMethod31==  "Single-Linkage")
-      method <- "single"
-    else
-        
-    if (input$replyMethod31=="Complete-Linkage")
-      method <- "complete"
-    else
-          
-    if (input$replyMethod31=="UPGMA")
-      method <- "average"
-    else
-            
-    if (input$replyMethod31=="WPGMA")
-      method <- "mcquitty"
-    else
-              
-    if (input$replyMethod31=="Ward's")
-      method <- "ward.D2"
-    else {}
-              
-    clus <- hclust(aggrMatDist(), method=method)
-
-    return(clus)
-  })
-
-  cophMatDist <- eventReactive(clusObj5(),
-  {
-    matCoph <- as.matrix(cophenetic(clusObj5()))
+    matCoph <- as.matrix(cophenetic(clusObj3()))
     matCoph[as.numeric(matCoph)==0] <- 1e-20
     return(stats::as.dist(matCoph)) 
-                                   
-  })
-
-  multObj5 <- reactive(
-  {
-    req(nrow(aggrMatDist())>3)
-    
-    if (global$replyMethod32=="Classical")
-    {
-      if (!global$selCophenetic)
-        fit <- cmdscale(aggrMatDist(), eig=TRUE, k=3)
-      else
-        fit <- cmdscale(cophMatDist(), eig=TRUE, k=3)
-      
-      coords <- as.data.frame(fit$points)
-    }
-
-    if (global$replyMethod32=="Kruskal's")
-    {
-      if (!global$selCophenetic)
-        fit <- isoMDS(aggrMatDist(), k=3)
-      else
-        fit <- isoMDS(cophMatDist(), k=3)
-        
-      coords <- as.data.frame(fit$points)
-    }
-
-    if (global$replyMethod32=="Sammon's")
-    {
-      if (!global$selCophenetic)
-        fit <- sammonMDS(aggrMatDist(), k=3)
-      else
-        fit <- sammonMDS(cophMatDist(), k=3)
-      
-      coords <- as.data.frame(fit$points)
-    }
-
-    if (global$replyMethod32=="t-SNE")
-    {
-      if (!global$selCophenetic)
-        fit <- Rtsne(aggrMatDist(), check_duplicates=FALSE, pca=TRUE, perplexity=getPerplexity(), theta=0.5, dims=3)
-      else
-        fit <- Rtsne(cophMatDist(), check_duplicates=FALSE, pca=TRUE, perplexity=getPerplexity(), theta=0.5, dims=3)
-      
-      coords <- as.data.frame(fit$Y)
-    }
-
-    if (!is.null(fit))
-    {
-      explVar <- formatC(x=round2((cor(aggrMatDist(), mdsDist(coords))^2)*100, n=1), digits = 1, format = "f")
-      contentOfMessage <- paste0("Variance explained by ", global$replyMethod32, " 3D MDS: ", explVar, "%.")
-      showNotification(contentOfMessage, type = "message", duration = NULL)
-      return(coords)      
-    }
   })
 
   multCol5 <- reactive(
   {
-    req(multObj5())
+    req(multObj33())
     
-    if (length(multObj5()) >0)
-      coords <- multObj5()
+    if (length(multObj33()) >0)
+      coords <- multObj33()
     else
       return(NULL)
     
@@ -6045,11 +6029,11 @@ server <- function(input, output, session)
       return(NULL)
     
     if (length(input$nColGroups) == 0)
-      nColGroups <- nGroups(clusObj5())
+      nColGroups <- nGroups(clusObj3())
     else
       nColGroups <- input$nColGroups
 
-    groupings <- cutree(clusObj5(), nColGroups)
+    groupings <- cutree(clusObj3(), nColGroups)
     
     partfile <- data.frame(variety=geoTab()[,1], group=as.character(groupings))
     write.table(partfile, file = paste0(tempDir, "area_map.tsv"), quote = F, row.names=F, col.names=T, sep="\t")
@@ -6229,7 +6213,7 @@ server <- function(input, output, session)
     if (input$selClass5=="Reference point map")
       type <- "reference_point"
 
-    return(paste0(type, "_map.",input$replyFormat5))
+    return(paste0(type, "_map.", input$replyFormat5))
   }
 
   output$downLoad5 <- downloadHandler(filename = fileName5, content = function(file)
@@ -6243,7 +6227,7 @@ server <- function(input, output, session)
         map5 <- plotGraph5()
         map5$x$options <- append(map5$x$options, list("zoomControl" = FALSE))
         saveWidget(map5, paste0(tempDir, "map.html"), selfcontained = FALSE)
-        webshot2::webshot(paste0(tempDir, "map.html"), file = file, zoom = dpi5(), vwidth = 0.6244378*input$winWidth, vheight = input$selSize5)
+        webshot2::webshot(paste0(tempDir, "map.html"), file = file, zoom = dpi5(), selector = "#htmlwidget_container", vwidth = 0.6244378*input$winWidth, vheight = input$selSize5)
       }
       else
         file.copy(paste0(tempDir, "area_map.tsv"), file, overwrite = T)
@@ -6254,6 +6238,18 @@ server <- function(input, output, session)
   })
 
   ##############################################################################
+
+  observeEvent(global$dataType,
+  {
+    if ((global$dataType == "transcriptions") | (global$dataType=="acousticdata" ))
+      choice <- "Bootstrap"
+
+    if ((global$dataType == "distancetable")  | (global$dataType=="distancetable"))
+      choice <- "Noise"
+
+    choices <- c("Dynamic tree cut", choice, "Affinity propagation", "HDBSCAN")
+    updateRadioButtons(session, "replyMethod6", choices = choices, selected = "Dynamic tree cut")
+  })
 
   silhouette_min_dist <- function(dist_matrix, labels, noise_label = 0) 
   {
@@ -6371,14 +6367,14 @@ server <- function(input, output, session)
     return(round2(mean(sil_scores), 4))
   }
 
-  observeEvent(c(input$replyMethod31, input$replyMethod6, aggrMat()),
+  observeEvent(c(global$replyMethod31, input$replyMethod6, aggrMat()),
   {
     global$minPts6 <- NULL          
   })
   
   setMinPts <- function()
   {
-    req(input$replyMethod31, input$replyMethod6, aggrMat())
+    req(global$replyMethod31, input$replyMethod6, aggrMat())
     
     if (((input$replyMethod6=="Dynamic tree cut") | (input$replyMethod6=="HDBSCAN")) & (length(aggrMat()) > 0))
     {
@@ -6412,7 +6408,7 @@ server <- function(input, output, session)
           {
             if (input$replyMethod6=="Dynamic tree cut")
             {
-              if ((length(input$replyMethod31)>0) && (input$replyMethod31=="Single-Linkage"))
+              if ((length(global$replyMethod31)>0) && (global$replyMethod31=="Single-Linkage"))
                 score <- silhouette_min_dist (as.dist(aggrMat()), partition, 0) 
               else          
                 score <- silhouette_mean_dist(as.dist(aggrMat()), partition, 0)
@@ -6453,10 +6449,10 @@ server <- function(input, output, session)
       value   = isolate(global$minPts6)
     )
   )
-  
+
   observeEvent(input$goButton6,
   {
-    req(global$finished, input$replyMethod31)
+    req(global$finished)
 
     global$finished6   <- FALSE
     global$background6 <- NULL
@@ -6506,24 +6502,31 @@ server <- function(input, output, session)
     {
       if (global$replyMethod31==  "Single-Linkage")
         methodc <- 1
-
+      else
+        
       if (global$replyMethod31=="Complete-Linkage")
         methodc <- 2
-
+      else
+        
       if (global$replyMethod31=="UPGMA")
         methodc <- 3
-
+      else
+        
       if (global$replyMethod31=="WPGMA")
         methodc <- 4
-
+      else
+        
       if (global$replyMethod31=="Ward's")
         methodc <- 7
-
+      else {}
+        
       if ( input$replyMethod6 =="Bootstrap")
         methodr <- 1
-
+      else
+        
       if ( input$replyMethod6 =="Noise")
         methodr <- 2
+      else {}
 
       if (file.exists(paste0(   tempDir, "partition.csv")))
         system(paste0("rm -f ", tempDir, "partition.csv"))
@@ -6666,7 +6669,7 @@ server <- function(input, output, session)
   output$degStab6 <- renderUI(
   {
     req(input$replyMethod6)
-    
+
     if ((input$replyMethod6=="Bootstrap") | (input$replyMethod6=="Noise"))
     {
       tagList(
@@ -6683,7 +6686,7 @@ server <- function(input, output, session)
           max     = 5,
           step    = 1,
           width   = "100px")),
-        
+
         br()
       )
     }
@@ -6724,7 +6727,7 @@ server <- function(input, output, session)
       )
     }
   })
-  
+
   output$dotRadiusArea6 <- renderUI(
   {
     tagList(
@@ -6866,7 +6869,7 @@ server <- function(input, output, session)
 
   fileName6 <- function()
   {
-    return(paste0("partition_map.",input$replyFormat6))
+    return(paste0("partition_map.", input$replyFormat6))
   }
 
   output$downLoad6 <- downloadHandler(filename = fileName6, content = function(file)
