@@ -60,7 +60,6 @@ addResourcePath("docs"      , "docs"      )
 addResourcePath("datasets1" , "datasets1" )
 addResourcePath("datasets2" , "datasets2" )
 addResourcePath("datasets3" , "datasets3" )
-addResourcePath("standalone", "standalone")
 
 ################################################################################
 
