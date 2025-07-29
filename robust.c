@@ -53,6 +53,7 @@ ptype       p;
 short       group;
 double      cr;
 double      stabcoef;
+short       stabcount;
 char        path[1024], path0[1024];
 char        *endptr;
 struct      lconv *loc;
@@ -960,7 +961,7 @@ double correlation()
   else
     logfile = fopen  (path0, "a");
   
-  fprintf(logfile, "% .5E\n", corr);
+  fprintf(logfile, "% .8E\n", corr);
 
   return corr;
 }
@@ -978,7 +979,7 @@ void setLinks()
   {
     for (i = 0; i <= j - 2; i++) 
     {
-      if (gg[i][j-1] / numIter >= 0.95)
+      if (gg[i][j-1] / nIter >= 0.95)
       {
         gg[i][j-1] = 0.0;
       }
@@ -1143,13 +1144,19 @@ int main(int argc, char *argv[])
     init_gg();
     srand((unsigned int) time(NULL));
 
-    for (nIter = 1; nIter <= numIter; nIter++) 
+    nIter     = 0;
+    stabcoef  = 0;
+    stabcount = 0;
+    
+    while (((numIter <= 0) != (nIter < numIter)) && (stabcount < 5))
     {
+      nIter++;
+
       if (methodr == 1)
-	    read_dd1(&dfile);
+        read_dd1(&dfile);
 
       if (methodr == 2)
-	    rand_dd();
+        rand_dd();
 
       initUsed();
       initClusters();
@@ -1171,11 +1178,19 @@ int main(int argc, char *argv[])
       findElbow(c, n, &number);
       updateCounts(number);
       stabcoef = correlation();
-    }
+      
+      if (stabcoef > 0.99999999)
+        stabcount = stabcount + 1;
+      else
+        stabcount = 0;
+    } 
 
     fclose(dfile);
 
-    fprintf(stderr, "Stability coefficient: %1.8f\n", stabcoef);
+    if (stabcoef > 0.99999999)
+      fprintf(stderr, "Number of iterations: %d\n", nIter);
+    else
+      fprintf(stderr, "Stable result not achieved!\n");
 
     setLinks();
     findGroups();
