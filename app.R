@@ -1676,8 +1676,9 @@ server <- function(input, output, session)
     dotRadiusRGB     = 6,
     dotRadiusRef     = 6,
 
-    numIter6         = 20,
-    minPts6          = NULL,     
+    numIter6         = 0,
+    minPts6          = NULL,
+    deepSplit6       = NULL,
     posLegend        = "br",
     selCophenetic    = FALSE,
     partition        = NULL
@@ -6252,16 +6253,10 @@ server <- function(input, output, session)
 
   silhouette_min_dist <- function(dist_matrix, labels, noise_label = 0) 
   {
-    # Convert dist object to matrix if needed
-    if (!inherits(dist_matrix, "dist") && !is.matrix(dist_matrix)) 
-    {
-      stop("dist_matrix must be a matrix or 'dist' object")
-    }
-    if (inherits(dist_matrix, "dist")) 
-    {
+    # Convert to matrix if needed
+    if (!is.matrix(dist_matrix)) 
       dist_matrix <- as.matrix(dist_matrix)
-    }
-  
+
     n <- nrow(dist_matrix)
     
     # Exclude noise points (label 0)
@@ -6308,18 +6303,64 @@ server <- function(input, output, session)
     return(round2(mean(sil_scores), 4))
   }
 
-  silhouette_mean_dist <- function(dist_matrix, labels, noise_label = 0) 
+  silhouette_max_dist <- function(dist_matrix, labels, noise_label = 0) 
   {
-    # Convert dist object to matrix if needed
-    if (!inherits(dist_matrix, "dist") && !is.matrix(dist_matrix)) 
-    {
-      stop("dist_matrix must be a matrix or 'dist' object")
-    }
-    if (inherits(dist_matrix, "dist")) 
-    {
+    # Convert to matrix if needed
+    if (!is.matrix(dist_matrix)) 
       dist_matrix <- as.matrix(dist_matrix)
+    
+    n <- nrow(dist_matrix)
+    
+    # Exclude noise points (label 0)
+    valid_idx <- labels != noise_label
+    
+    if (length(unique(valid_idx)) == 0)
+      return(NULL)
+    
+    dist_matrix <- dist_matrix[valid_idx, valid_idx]
+    labels <- labels[valid_idx]
+    n_valid <- length(labels)
+    
+    sil_scores <- numeric(n_valid)
+    
+    for (i in 1:n_valid) 
+    {
+      own_cluster <- labels[i]
+      
+      # Intra-cluster distances (excluding self)
+      same_cluster <- which(labels == own_cluster & seq_len(n_valid) != i)
+      if (length(same_cluster) > 0) 
+      {
+        a_i <- max(dist_matrix[i, same_cluster])
+      } 
+      else 
+      {
+        a_i <- 0  # singleton cluster
+      }
+      
+      # Inter-cluster mean distances
+      other_clusters <- unique(labels[labels != own_cluster])
+      b_i <- Inf
+      
+      for (cl in other_clusters) 
+      {
+        cl_points <- which(labels == cl)
+        b_i <- min(b_i, max(dist_matrix[i, cl_points]))
+      }
+      
+      # Silhouette formula
+      sil_scores[i] <- ifelse(max(a_i, b_i) == 0, 0, (b_i - a_i) / max(a_i, b_i))
     }
-  
+    
+    return(round2(mean(sil_scores), 4))
+  }
+
+  silhouette_avg_dist <- function(dist_matrix, labels, noise_label = 0) 
+  {
+    # Convert to matrix if needed
+    if (!is.matrix(dist_matrix)) 
+      dist_matrix <- as.matrix(dist_matrix)
+
     n <- nrow(dist_matrix)
   
     # Exclude noise points (label 0)
@@ -6366,11 +6407,43 @@ server <- function(input, output, session)
     return(round2(mean(sil_scores), 4))
   }
 
+  cdbw_index <- function(dist_matrix, labels, noise_label = 0, extra = FALSE) 
+  {
+    # Convert to matrix if needed
+    if (!is.matrix(dist_matrix)) 
+      dist_matrix <- as.matrix(dist_matrix)
+
+    # Exclude noise points (label 0)
+    valid_idx <- labels != noise_label
+    
+    if (length(unique(valid_idx)) == 0)
+      return(NULL)
+    
+    dist_matrix <- dist_matrix[valid_idx, valid_idx]
+    labels <- labels[valid_idx]
+
+    if (length(unique(labels)) == 1)
+      return(NA)
+
+    # Calculate CDbw index
+    result <- cdbw(dist_matrix, labels)
+    
+    if (extra)
+    {
+      cat("\nCDbw index: " , format(round2(result$cdbw       , 4), digits = 5),
+           " cohesion: "   , format(round2(result$cohesion   , 4), digits = 5),
+           " compactness: ", format(round2(result$compactness, 4), digits = 5),
+           " separation: " , format(round2(result$sep        , 4), digits = 5), "\n")
+    }
+
+    return(round2(result$cdbw, 4))
+  }
+
   observeEvent(c(global$replyMethod31, input$replyMethod6, aggrMat()),
   {
     global$minPts6 <- NULL          
   })
-  
+
   setMinPts <- function()
   {
     req(global$replyMethod31, input$replyMethod6, aggrMat())
@@ -6381,63 +6454,75 @@ server <- function(input, output, session)
       {
         n <- ncol(aggrMat())
         
-        best_score     <- 0
+        best_score     <- -Inf
         best_minPts    <- NA
+        best_deepSplit <- NA
         best_partition <- c()
         
         for (minPts in 2:(n-1)) 
-        {
-          if (input$replyMethod6=="Dynamic tree cut")
-            partition <- cutreeDynamic(dendro         = clusObj3(),
-                                       distM          = as.matrix(aggrMat()),
-                                       method         = "hybrid",
-                                       deepSplit      = 2,
-                                       minClusterSize = minPts)
-          
-          if (input$replyMethod6=="HDBSCAN")
-          {
-            result <- hdbscan(as.dist(aggrMat()), minPts = minPts)
-            partition <- result$cluster
-          }
-          
-          partition0 <- partition        
-          partition  <- partition[partition!=0]
-          
-          if (length(unique(partition)) > 0)
+        { 
+          for (deepSplit in 0:4) 
           {
             if (input$replyMethod6=="Dynamic tree cut")
-            {
-              if ((length(global$replyMethod31)>0) && (global$replyMethod31=="Single-Linkage"))
-                score <- silhouette_min_dist (as.dist(aggrMat()), partition, 0) 
-              else          
-                score <- silhouette_mean_dist(as.dist(aggrMat()), partition, 0)
-            }
+              partition <- cutreeDynamic(dendro         = clusObj3(),
+                                         distM          = as.matrix(aggrMat()),
+                                         method         = "hybrid",
+                                         deepSplit      = deepSplit,
+                                         minClusterSize = minPts,
+                                         verbose        = 0)
             
             if (input$replyMethod6=="HDBSCAN")
             {
-              sizes <- as.numeric(table(partition))           
-              score <- weighted.mean(result$cluster_scores, sizes)
+              result <- hdbscan(as.dist(aggrMat()), minPts = minPts)
+              partition <- result$cluster
             }
             
-            if (is.na(score))
-              next
+            partition0 <- partition        
+            partition  <- partition[partition!=0]
             
-            if (score > best_score) 
+            if (length(unique(partition)) > 0)
             {
-              best_score     <- score
-              best_minPts    <- minPts
-              best_partition <- partition0
-            }
-          }  
+              if (input$replyMethod6=="Dynamic tree cut")
+              {
+                if (global$replyMethod31==  "Single-Linkage")
+                  score <- silhouette_min_dist(aggrMat(), partition0, 0)
+                else
+                  
+                if (global$replyMethod31=="Complete-Linkage")
+                  score <- silhouette_max_dist(aggrMat(), partition0, 0)
+                else
+                  score <- silhouette_avg_dist(aggrMat(), partition0, 0)  
+              }
+              
+              if (input$replyMethod6=="HDBSCAN")
+              {
+              # sizes <- as.numeric(table(partition))           
+              # score <- weighted.mean(result$cluster_scores, sizes)
+                score <- silhouette_min_dist(aggrMat(), partition0, 0)
+              }
+              
+              if (is.na(score))
+                next
+              
+              if (score > best_score) 
+              {
+                best_score     <- score
+                best_minPts    <- minPts
+                best_deepSplit <- deepSplit
+                best_partition <- partition0
+              }
+              
+              if (input$replyMethod6=="HDBSCAN")
+                break;
+            }  
+          }
         }
         
-        if (!is.na(best_minPts))
-          global$minPts6 <- best_minPts
-        else
-          global$minPts6 <- 2
+        global$minPts6    <- best_minPts
+        global$deepSplit6 <- best_deepSplit
       }
       else
-        global$minPts6 <- isolate(input$minPts6)        
+        global$minPts6    <- isolate(input$minPts6)
     }
   }
 
@@ -6585,8 +6670,9 @@ server <- function(input, output, session)
         partition <- cutreeDynamic(dendro         = clusObj3(),
                                    distM          = as.matrix(aggrMat()),
                                    method         = "hybrid",
-                                   deepSplit      = 2,
-                                   minClusterSize = global$minPts6)
+                                   deepSplit      = global$deepSplit6,
+                                   minClusterSize = global$minPts6,
+                                   verbose        = 0)
 
       if  (input$replyMethod6=="HDBSCAN")
         partition <- hdbscan(as.dist(aggrMat()), minPts = global$minPts6)$cluster
@@ -6648,10 +6734,13 @@ server <- function(input, output, session)
 
       showNotification(paste(nClass, "varieties out of", nAll, "are classified into", nGroups, "groups."), type = "message", duration = NULL)
 
-      silhMin  <- silhouette_min_dist (dist_matrix=as.dist(aggrMat()), labels=global$partition$V1, noise_label=0)
-      silhMean <- silhouette_mean_dist(dist_matrix=as.dist(aggrMat()), labels=global$partition$V1, noise_label=0)
-      
-      showNotification(paste0("Silhouette: ", silhMin, " (min. dist.), ", silhMean, " (mean dist.)"), type = "message", duration = NULL)
+      silhMin <- silhouette_min_dist(dist_matrix=as.dist(aggrMat()), labels=global$partition$V1, noise_label=0)
+      silhMax <- silhouette_max_dist(dist_matrix=as.dist(aggrMat()), labels=global$partition$V1, noise_label=0)
+      silhAvg <- silhouette_avg_dist(dist_matrix=as.dist(aggrMat()), labels=global$partition$V1, noise_label=0)
+      showNotification(paste0("Silhouette: ", silhMin, " (min. dist.), ", silhMax, " (max. dist.), ", silhAvg, " (avg. dist.)"), type = "message", duration = NULL)
+
+      score <- cdbw_index(dist_matrix=aggrMat(), labels=global$partition$V1, noise_label=0, extra = T)
+      cat("minimum cluster size: ", global$minPts6, " deepSplit: ", global$deepSplit6, "\n")
 
       insertUI(
         selector = "#goButton",
@@ -6681,7 +6770,7 @@ server <- function(input, output, session)
           inputId = "numIter6",
           label   = NULL,
           value   = isolate(global$numIter6),
-          min     = 20,
+          min     = 0,
           max     = 10000,
           step    = 1,
           width   = "100px")),
