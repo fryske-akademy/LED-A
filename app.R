@@ -1676,7 +1676,7 @@ server <- function(input, output, session)
     dotRadiusRGB     = 6,
     dotRadiusRef     = 6,
 
-    numIter6         = 0,
+    numIter6         = 1000,
     minPts6          = NULL,
     deepSplit6       = NULL,
     posLegend        = "br",
@@ -6244,10 +6244,10 @@ server <- function(input, output, session)
     if ((global$dataType == "transcriptions") | (global$dataType=="acousticdata" ))
       choice <- "Bootstrap"
 
-    if ((global$dataType == "distancetable")  | (global$dataType=="distancetable"))
+    if ((global$dataType == "postaggeddata")  | (global$dataType=="distancetable"))
       choice <- "Noise"
 
-    choices <- c("Dynamic tree cut", choice, "Affinity propagation", "HDBSCAN")
+    choices <- c("Largest gap", "Dynamic tree cut", choice, "PAM", "Affinity propagation", "HDBSCAN")
     updateRadioButtons(session, "replyMethod6", choices = choices, selected = "Dynamic tree cut")
   })
 
@@ -6407,38 +6407,6 @@ server <- function(input, output, session)
     return(round2(mean(sil_scores), 4))
   }
 
-  cdbw_index <- function(dist_matrix, labels, noise_label = 0, extra = FALSE) 
-  {
-    # Convert to matrix if needed
-    if (!is.matrix(dist_matrix)) 
-      dist_matrix <- as.matrix(dist_matrix)
-
-    # Exclude noise points (label 0)
-    valid_idx <- labels != noise_label
-    
-    if (length(unique(valid_idx)) == 0)
-      return(NULL)
-    
-    dist_matrix <- dist_matrix[valid_idx, valid_idx]
-    labels <- labels[valid_idx]
-
-    if (length(unique(labels)) == 1)
-      return(NA)
-
-    # Calculate CDbw index
-    result <- cdbw(dist_matrix, labels)
-    
-    if (extra)
-    {
-      cat("\nCDbw index: " , format(round2(result$cdbw       , 4), digits = 5),
-           " cohesion: "   , format(round2(result$cohesion   , 4), digits = 5),
-           " compactness: ", format(round2(result$compactness, 4), digits = 5),
-           " separation: " , format(round2(result$sep        , 4), digits = 5), "\n")
-    }
-
-    return(round2(result$cdbw, 4))
-  }
-
   observeEvent(c(global$replyMethod31, input$replyMethod6, aggrMat()),
   {
     global$minPts6 <- NULL          
@@ -6470,40 +6438,43 @@ server <- function(input, output, session)
                                          deepSplit      = deepSplit,
                                          minClusterSize = minPts,
                                          verbose        = 0)
-            
+
             if (input$replyMethod6=="HDBSCAN")
             {
               result <- hdbscan(as.dist(aggrMat()), minPts = minPts)
               partition <- result$cluster
             }
-            
+
             partition0 <- partition        
             partition  <- partition[partition!=0]
-            
+
             if (length(unique(partition)) > 0)
             {
-              if (input$replyMethod6=="Dynamic tree cut")
-              {
-                if (global$replyMethod31==  "Single-Linkage")
-                  score <- silhouette_min_dist(aggrMat(), partition0, 0)
-                else
-                  
-                if (global$replyMethod31=="Complete-Linkage")
-                  score <- silhouette_max_dist(aggrMat(), partition0, 0)
-                else
-                  score <- silhouette_avg_dist(aggrMat(), partition0, 0)  
-              }
-              
-              if (input$replyMethod6=="HDBSCAN")
+              if ((input$replyMethod6=="Dynamic tree cut") & (global$replyMethod31==  "Single-Linkage"))
+                score <- silhouette_min_dist(aggrMat(), partition0, 0)
+
+              if ((input$replyMethod6=="Dynamic tree cut") & (global$replyMethod31=="Complete-Linkage"))
+                score <- silhouette_max_dist(aggrMat(), partition0, 0)
+
+              if ((input$replyMethod6=="Dynamic tree cut") & (global$replyMethod31=="UPGMA"))
+                score <- silhouette_avg_dist(aggrMat(), partition0, 0)
+                
+              if ((input$replyMethod6=="Dynamic tree cut") & (global$replyMethod31=="WPGMA"))
+                score <- silhouette_avg_dist(aggrMat(), partition0, 0)
+                
+              if ((input$replyMethod6=="Dynamic tree cut") & (global$replyMethod31=="Ward's"))
+                score <- silhouette_avg_dist(aggrMat(), partition0, 0)    
+
+              if  (input$replyMethod6=="HDBSCAN")
               {
               # sizes <- as.numeric(table(partition))           
               # score <- weighted.mean(result$cluster_scores, sizes)
-                score <- silhouette_min_dist(aggrMat(), partition0, 0)
+                score <- silhouette_avg_dist(aggrMat(), partition0, 0)
               }
-              
+
               if (is.na(score))
                 next
-              
+
               if (score > best_score) 
               {
                 best_score     <- score
@@ -6511,10 +6482,10 @@ server <- function(input, output, session)
                 best_deepSplit <- deepSplit
                 best_partition <- partition0
               }
-              
-              if (input$replyMethod6=="HDBSCAN")
-                break;
-            }  
+            }
+
+            if (input$replyMethod6=="HDBSCAN")
+              break;
           }
         }
         
@@ -6582,6 +6553,39 @@ server <- function(input, output, session)
       write_tsv(df, file = paste0(tempDir, "individual.tsv"), col_names = T, quote = "none", escape = "none")
     }
 
+    Partition0 <- function()
+    {
+      if (file.exists(paste0(   tempDir, "partition.csv")))
+        system(paste0("rm -f ", tempDir, "partition.csv"))
+
+      if (input$replyMethod6=="Largest gap")
+        partition <- cutree(clusObj3(), nGroups(clusObj3()))
+
+      if (input$replyMethod6=="PAM")
+      {
+        result <- pamk(as.dist(aggrMat()), krange=2:(nrow(aggrMat())-1), usepam=TRUE, diss = TRUE)
+        partition <- as.numeric(result$pamobject$clustering)
+      }
+
+      freq <- table(partition)
+      partition[partition %in% as.numeric(names(freq[freq == 1]))] <- 0
+        
+      nonzero <- sort(unique(partition[partition != 0]))
+      mapping <- setNames(seq_along(nonzero), nonzero)
+      partition[partition != 0] <- mapping[as.character(partition[partition != 0])]
+        
+      df <-  data.frame(
+        cluster = partition,
+        variety = colnames(aggrMat())
+      )
+
+      write_csv(df, paste0(tempDir, "partition.csv"), col_names = F)
+      
+      global$background6 <- r_bg(
+        func = function(){return(NULL)}
+      )
+    }
+
     Partition1 <- function()
     {
       if (global$replyMethod31==  "Single-Linkage")
@@ -6636,24 +6640,27 @@ server <- function(input, output, session)
       if (file.exists(paste0(   tempDir, "partition.csv")))
         system(paste0("rm -f ", tempDir, "partition.csv"))
 
-      result <- apcluster(s=max(aggrMat()) - aggrMat())
-      
-      df <-  data.frame(
-        cluster = 0,  
-        variety = colnames(aggrMat())
-      )
-      
-      for (i in 1:nrow(df))
+      if (input$replyMethod6=="Affinity propagation")
       {
-        for (j in 1:length(result@clusters))
+        result <- apcluster(s=max(aggrMat()) - aggrMat())
+        
+        df <-  data.frame(
+          cluster = 0,  
+          variety = colnames(aggrMat())
+        )
+        
+        for (i in 1:nrow(df))
         {
-          if (is.element(i, result@clusters[[j]]))
-            df$cluster[i] <- j
+          for (j in 1:length(result@clusters))
+          {
+            if (is.element(i, result@clusters[[j]]))
+              df$cluster[i] <- j
+          }
         }
       }
       
       write_csv(df, paste0(tempDir, "partition.csv"), col_names = F)
-      
+
       global$background6 <- r_bg(
         func = function(){return(NULL)}
       )
@@ -6688,6 +6695,11 @@ server <- function(input, output, session)
         func = function(){return(NULL)}
       )
     }
+
+    if ((input$replyMethod6=="Largest gap") |
+        (input$replyMethod6=="PAM"))
+      Partition0()
+    else 
 
     if ((input$replyMethod6=="Bootstrap") | 
         (input$replyMethod6=="Noise"))
@@ -6739,7 +6751,6 @@ server <- function(input, output, session)
       silhAvg <- silhouette_avg_dist(dist_matrix=as.dist(aggrMat()), labels=global$partition$V1, noise_label=0)
       showNotification(paste0("Silhouette: ", silhMin, " (min. dist.), ", silhMax, " (max. dist.), ", silhAvg, " (avg. dist.)"), type = "message", duration = NULL)
 
-      score <- cdbw_index(dist_matrix=aggrMat(), labels=global$partition$V1, noise_label=0, extra = T)
       cat("minimum cluster size: ", global$minPts6, " deepSplit: ", global$deepSplit6, "\n")
 
       insertUI(
@@ -6770,8 +6781,8 @@ server <- function(input, output, session)
           inputId = "numIter6",
           label   = NULL,
           value   = isolate(global$numIter6),
-          min     = 0,
-          max     = 10000,
+          min     = 10,
+          max     = 100000,
           step    = 1,
           width   = "100px")),
 
