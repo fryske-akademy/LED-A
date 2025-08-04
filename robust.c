@@ -52,8 +52,6 @@ short       methodc, methodr, numIter, nIter;
 ptype       p;
 short       group;
 double      cr;
-double      stabcoef;
-short       stabcount;
 char        path[1024], path0[1024];
 char        *endptr;
 struct      lconv *loc;
@@ -293,6 +291,47 @@ void readLine(FILE **fp, double *value)
   }
 }
 
+void read_dd0(FILE **fp)
+{
+  short i, j, w;
+  double v, sum, count;
+
+  rewind(*fp);
+  fscanf(*fp, "%*[^\n]");
+
+  getc(*fp);
+  for (i = 0; i <= mn - 1; i++) 
+  {
+    for (j = 0; j <= mn - 1; j++)
+    {
+      dd0[i][j] = 0.0;
+    }
+  }
+
+  for (i = 2; i <= n; i++) 
+  {
+    for (j = 0; j <= i - 2; j++) 
+    {
+      sum = 0.0;
+      count = 0.0;
+
+      for (w = 1; w <= m; w++) 
+      {
+	    readLine(fp, &v);
+
+	    if (v >= 0) 
+	    {
+	      sum += v;
+	      count++;
+	    }
+      }
+
+      dd0[i-1][j] = sum / count;
+      dd0[j][i-1] = dd0[i-1][j];
+    }
+  }
+}
+
 void read_dd1(FILE **fp)
 {
   short i, j, w;
@@ -346,47 +385,6 @@ void read_dd1(FILE **fp)
   }
 }
 
-void read_dd2(FILE **fp)
-{
-  short i, j, w;
-  double v, sum, count;
-
-  rewind(*fp);
-  fscanf(*fp, "%*[^\n]");
-
-  getc(*fp);
-  for (i = 0; i <= mn - 1; i++) 
-  {
-    for (j = 0; j <= mn - 1; j++)
-    {
-      dd0[i][j] = 0.0;
-    }
-  }
-
-  for (i = 2; i <= n; i++) 
-  {
-    for (j = 0; j <= i - 2; j++) 
-    {
-      sum = 0.0;
-      count = 0.0;
-
-      for (w = 1; w <= m; w++) 
-      {
-	    readLine(fp, &v);
-
-	    if (v >= 0) 
-	    {
-	      sum += v;
-	      count++;
-	    }
-      }
-
-      dd0[i-1][j] = sum / count;
-      dd0[j][i-1] = dd0[i-1][j];
-    }
-  }
-}
-
 void init_sd()
 {
   short i, j;
@@ -419,25 +417,12 @@ void init_sd()
   sd = sqrt(mean);
 }
 
-void init_gg()
-{
-  short i, j;
-
-  for (j = 2; j <= n; j++) 
-  {
-    for (i = 0; i <= j - 2; i++)
-    {
-      gg[i][j-1] = 0.0;
-    }
-  }
-}
-
 double rand_(double min, double max)
 {
   return (min + ((double)rand() / (RAND_MAX)) * (max - min));
 }
 
-void rand_dd()
+void rand_dd2()
 {
   short i, j;
 
@@ -889,6 +874,19 @@ void findElbow(double *c, short n, short *number)
   }
 }
 
+void init_gg()
+{
+  short i, j;
+
+  for (j = 2; j <= n; j++) 
+  {
+    for (i = 0; i <= j - 2; i++)
+    {
+      gg[i][j-1] = 0.0;
+    }
+  }
+}
+
 void updateCounts(short t0)
 {
   short i, j, t;
@@ -961,7 +959,7 @@ double correlation()
   else
     logfile = fopen  (path0, "a");
   
-  fprintf(logfile, "% .8E\n", corr);
+  fprintf(logfile, "%.10f\n", corr);
 
   return corr;
 }
@@ -1135,62 +1133,45 @@ int main(int argc, char *argv[])
     strcat(path0, dname);
     openr(&dfile, path0);
 
+    read_dd0(&dfile);
+    
     if (methodr == 2) 
-    {
-      read_dd2(&dfile);
       init_sd();
-    }
 
     init_gg();
     srand((unsigned int) time(NULL));
 
-    nIter     = 0;
-    stabcoef  = 0;
-    stabcount = 0;
-    
-    while (((numIter <= 0) != (nIter < numIter)) && (stabcount < 5))
+    for (nIter = 0; nIter <= numIter; nIter++) 
     {
-      nIter++;
-
       if (methodr == 1)
         read_dd1(&dfile);
 
       if (methodr == 2)
-        rand_dd();
+        rand_dd2();
 
       initUsed();
       initClusters();
 
       for (t = (n + 1); t <= (n + n - 1); t++) 
       {
-	    searchSmallest(&i, &j, t);
-	    updateMatrix(i, j, t);
-	    makeCluster(i, j, t);
+        searchSmallest(&i, &j, t);
+        updateMatrix(i, j, t);
+        makeCluster(i, j, t);
       }
 
       c[0] = 0.0;
       for (t = 2; t <= n; t++) 
       {
-	    cr = copheneticCorrelation(t);
-	    c[t-1] = cr * cr;
+        cr = copheneticCorrelation(t);
+        c[t-1] = cr * cr;
       }
 
       findElbow(c, n, &number);
       updateCounts(number);
-      stabcoef = correlation();
-      
-      if (stabcoef > 0.99999999)
-        stabcount = stabcount + 1;
-      else
-        stabcount = 0;
+      correlation();
     } 
 
     fclose(dfile);
-
-    if (stabcoef > 0.99999999)
-      fprintf(stderr, "Number of iterations: %d\n", nIter);
-    else
-      fprintf(stderr, "Stable result not achieved!\n");
 
     setLinks();
     findGroups();
