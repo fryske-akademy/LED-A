@@ -4413,35 +4413,50 @@ server <- function(input, output, session)
   {
     req(nrow(aggrMatDist())>3)
     
-    if (input$replyMethod32=="Classical")
+    if (global$replyMethod32=="Classical")
     {
-      fit <- cmdscale(aggrMatDist(), eig=TRUE, k=2)
-      coords <- as.data.frame(fit$points)
-      cat("stress: ", sqrt(sum((aggrMatDist() - dist(coords))^2) / sum(aggrMatDist()^2)), "\n")
-    }
-
-    if (input$replyMethod32=="Kruskal's")
-    {
-      fit <- isoMDS(aggrMatDist(), k=2)
+      if (!global$selCophenetic)
+        fit <- cmdscale(aggrMatDist(), eig=TRUE, k=2)
+      else
+        fit <- cmdscale(cophMatDist(), eig=TRUE, k=2)
+      
       coords <- as.data.frame(fit$points)
     }
 
-    if (input$replyMethod32=="Sammon's")
+    if (global$replyMethod32=="Kruskal's")
     {
-      fit <- sammonMDS(aggrMatDist(), k=2)
+      if (!global$selCophenetic)
+        fit <- isoMDS(aggrMatDist(), k=2)
+      else
+        fit <- isoMDS(cophMatDist(), k=2)
+        
       coords <- as.data.frame(fit$points)
     }
 
-    if (input$replyMethod32=="t-SNE")
+    if (global$replyMethod32=="Sammon's")
     {
-      fit <- Rtsne(aggrMatDist(), check_duplicates=FALSE, pca=TRUE, perplexity=getPerplexity(), theta=0.5, dims=2)
+      if (!global$selCophenetic)
+        fit <- sammonMDS(aggrMatDist(), k=2)
+      else
+        fit <- sammonMDS(cophMatDist(), k=2)
+      
+      coords <- as.data.frame(fit$points)
+    }
+
+    if (global$replyMethod32=="t-SNE")
+    {
+      if (!global$selCophenetic)
+        fit <- Rtsne(aggrMatDist(), check_duplicates=FALSE, pca=TRUE, perplexity=getPerplexity(), theta=0.5, dims=2)
+      else
+        fit <- Rtsne(cophMatDist(), check_duplicates=FALSE, pca=TRUE, perplexity=getPerplexity(), theta=0.5, dims=2)
+      
       coords <- as.data.frame(fit$Y)
     }
 
     if (!is.null(fit))
     {
       explVar <- formatC(x=round2((cor(aggrMatDist(), mdsDist(coords))^2)*100, n=1), digits = 1, format = "f")
-      contentOfMessage <- paste0("Variance explained by ", input$replyMethod32, " 2D MDS: ", explVar, "%.")
+      contentOfMessage <- paste0("Variance explained by ", global$replyMethod32, " 2D MDS: ", explVar, "%.")
       showNotification(contentOfMessage, type = "message", duration = NULL)
       return(coords)      
     }
