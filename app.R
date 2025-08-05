@@ -867,6 +867,7 @@ ui <- tagList(
           div(style='margin-left: 60px', radioButtons('selClass3', NULL, c("Cluster analysis", "Multidimensional scaling"), selected = "Cluster analysis", inline = FALSE)),
 
           uiOutput('selMethod3'),
+          uiOutput("selCophenetic"),
           uiOutput("selClus3"),
           uiOutput("selMult3"),
           uiOutput("maxOverlaps"),
@@ -948,9 +949,7 @@ ui <- tagList(
           uiOutput("dotRadiusRef"    ),
 
           uiOutput("selBorder5"),
-          
-          uiOutput("selCophenetic"),
-          uiOutput("posLegend")
+          uiOutput("posLegend" )
         ),
 
         column
@@ -1676,11 +1675,11 @@ server <- function(input, output, session)
     dotRadiusRGB     = 6,
     dotRadiusRef     = 6,
 
+    selCophenetic    = FALSE,
+    posLegend        = "br",
     numIter6         = 1000,
     minPts6          = NULL,
     deepSplit6       = NULL,
-    posLegend        = "br",
-    selCophenetic    = FALSE,
     partition        = NULL
   )
 
@@ -4565,6 +4564,23 @@ server <- function(input, output, session)
     global$replyMethod32 <- input$replyMethod32
   })
 
+  output$selCophenetic <- renderUI(
+  {
+    req(aggrMat(), input$selClass3)
+      
+    if ((nrow(aggrMat()) >= 3) && (input$selClass3=="Multidimensional scaling"))
+      tagList(
+        div(style='margin-left: 60px', checkboxInput(inputId = "selCophenetic",
+                                                     label   = "Use cophenetic distances",
+                                                     value   = isolate(global$selCophenetic))),
+      )
+  })
+  
+  observeEvent(input$selCophenetic,
+  {
+    global$selCophenetic <- input$selCophenetic
+  })
+
   output$selClus3 <- renderUI(
   {
     req(aggrMat(), input$selClass3)
@@ -5710,29 +5726,6 @@ server <- function(input, output, session)
   observeEvent(input$posLegend,
   {
     global$posLegend  <- input$posLegend
-  })
-
-  output$selCophenetic <- renderUI(
-  {
-    req(input$selClass5)
-      
-    if (input$selClass5 == "RGB map")
-      tagList(
-        bsButton("butselCophenetic", label = NULL, icon = icon("info"), size = "extra-small"),
-        bsModal ("modselCophenetic", "Choose distances", "butselCophenetic", size = "large", "Dit is de helptekst"),
-        
-        HTML("<span style='font-weight: bold;'>&nbsp;Choose distances:</span>"),
-        div(style='height: 4px'),
-        div(style='margin-left: 60px', checkboxInput(inputId = "selCophenetic",
-                                                     label   = "Cophenetic",
-                                                     value   = isolate(global$selCophenetic))),
-        br()
-      )
-  })
-  
-  observeEvent(input$selCophenetic,
-  {
-    global$selCophenetic <- input$selCophenetic
   })
 
   beamGeo5 <- reactive(
