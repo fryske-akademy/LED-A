@@ -19,7 +19,6 @@ library(ggrepel)
 library(deldir)
 library(ggdendro)
 library(dynamicTreeCut)
-library(apcluster)
 library(dbscan)
 library(fpc)
 library(MASS)
@@ -1000,9 +999,9 @@ ui <- tagList(
           br(),
 
           bsButton("butReplyMethod6", label = NULL, icon = icon("info"), size = "extra-small"),
-          bsModal ("modReplyMethod6", "Cluster method", "butReplyMethod6", size = "large", "Dit is de helptekst"),
+          bsModal ("modReplyMethod6", "Partitioning method", "butReplyMethod6", size = "large", "Dit is de helptekst"),
 
-          HTML("<span style='font-weight: bold;'>&nbsp;Cluster method:</span>"),
+          HTML("<span style='font-weight: bold;'>&nbsp;Partitioning method:</span>"),
           div(style='height: 12px'),
           div(style='margin-left: 60px', radioButtons('replyMethod6',
                                                       NULL,
@@ -1013,7 +1012,7 @@ ui <- tagList(
           br(),
 
           uiOutput("numIter6"      ),
-          uiOutput("minPts6"       ),
+          uiOutput("clusPar6"      ),
           uiOutput("dotRadiusArea6"),
           uiOutput("selBorder6"    ),
           
@@ -1141,8 +1140,6 @@ ui <- tagList(
 
           tags$div(tags$ul
           (
-            tags$li(tags$span(HTML("<span style='color:blue'>apcluster</span>"), p("Ulrich Bodenhofer, Andreas Kothmeier, and Sepp Hochreiter (2011) APCluster: an R package for affinity propagation clustering Bioinformatics 27:2463-2464.", br(),
-                                                                                   "Brendan J. Frey and Delbert Dueck (2007). Clustering by passing messages between data points. Science 315:972-977."))),
             tags$li(tags$span(HTML("<span style='color:blue'>base</span>"), p("R Core Team (2023). _R: A Language and Environment for Statistical Computing_. R Foundation for Statistical Computing, Vienna, Austria. URL: https://www.R-project.org/."))),
             tags$li(tags$span(HTML("<span style='color:blue'>Cairo</span>"), p("Urbanek S, Horner J (2022). _Cairo: R Graphics Device using Cairo Graphics Library for Creating High-Quality Bitmap (PNG, JPEG, TIFF), Vector (PDF, SVG, PostScript) and Display (X11 and Win32) Output_. URL: https://CRAN.R-project.org/package=Cairo."))),
             tags$li(tags$span(HTML("<span style='color:blue'>callr</span>"), p("Csárdi G, Chang W (2022). _callr: Call R from R_. URL: https://CRAN.R-project.org/package=callr."))),
@@ -1641,7 +1638,8 @@ server <- function(input, output, session)
 
     replyMethod31    = "UPGMA",
     replyMethod32    = "Kruskal's",
-
+    replyMethod6     = "Constant height cut",
+    
     nColGroups       = NULL,
     showLegend       = FALSE,
     legendLabels     = NULL,
@@ -1678,7 +1676,7 @@ server <- function(input, output, session)
     selCophenetic    = FALSE,
     posLegend        = "br",
     numIter6         = 1000,
-    minPts6          = NULL,
+    clusPar6         = NULL,
     deepSplit6       = NULL,
     partition        = NULL
   )
@@ -3160,9 +3158,15 @@ server <- function(input, output, session)
   snd2MFCC <- function(s0, s)
   {
     w <- readWave(s0)
-    m <- na.omit(melfcc(w, numcep =  9, minfreq = 50, maxfreq = 5000, nbands = 32))
-    m <- standardize(m)
-    write.table(m, file = paste0(tempDir, s), quote = F, row.names = F, col.names = T, sep=",")
+    
+    if ((length(w@left) / w@samp.rate) > 0.05)
+    {
+      m <- na.omit(melfcc(w, numcep =  9, minfreq = 50, maxfreq = 5000, nbands = 32))
+      m <- standardize(m)
+      write.table(m, file = paste0(tempDir, s), quote = F, row.names = F, col.names = T, sep=",")
+    }
+    else
+      showNotification(HTML(paste0("The duration of sound file ", s, " is too short, it will be skipped!")), type = "message", duration = NULL)
   }
   
   filePrep <- function(varieties, items, genNum)
@@ -4332,8 +4336,14 @@ server <- function(input, output, session)
     if (global$replyMethod31=="Ward's")
       method <- "ward.D2"
     else {}
-    
-    clus <- hclust(aggrMatDist(), method=method)
+
+    if (global$replyMethod31!="HDBSCAN")
+      clus <- hclust (aggrMatDist(), method=method)
+    else
+    {
+      clus <- hdbscan(aggrMatDist(), minPts=2)$hc
+      clus$labels <- rownames(aggrMat())
+    }
 
     explVar <- formatC(x=round2((cor(aggrMatDist(), cophenetic(clus))^2)*100, n=1), digits = 1, format = "f")
     contentOfMessage <- paste0("Variance explained by ", global$replyMethod31, " clustering: ", explVar, "%.")
@@ -4529,7 +4539,7 @@ server <- function(input, output, session)
         div(style='height: 12px'),
         div(style='margin-left: 60px', radioButtons('replyMethod31',
                                        NULL,
-                                       c("Single-Linkage","Complete-Linkage","UPGMA","WPGMA","Ward's"),
+                                       c("Single-Linkage","Complete-Linkage","UPGMA","WPGMA","Ward's", "HDBSCAN"),
                                        selected=isolate(global$replyMethod31),
                                        inline = FALSE))
       )
@@ -4613,11 +4623,7 @@ server <- function(input, output, session)
   {
     req(input$replyMethod31)
     global$nColGroups <- nGroups(clusObj3())
-
-    updateNumericInput(
-      session = session,
-      inputId = 'nColGroups',
-      value   = global$nColGroups
+    updateNumericInput(session = session, inputId = 'nColGroups', value = global$nColGroups
     )
   })
 
@@ -5933,7 +5939,7 @@ server <- function(input, output, session)
     labOpts <- NULL
 
     m <- leaflet() %>%
-      fitBounds(min(df$long), min(df$lat), max(df$long), max(df$lat)) %>%
+      fitBounds(min(geoTab()$long), min(geoTab()$lat), max(geoTab()$long), max(geoTab()$lat)) %>%
       addProviderTiles(provider     = do.call(selProvider, args = list())) %>%
 
       addCircleMarkers(lng          = df$long,
@@ -6247,17 +6253,90 @@ server <- function(input, output, session)
 
   ##############################################################################
 
-  observeEvent(global$dataType,
+  observeEvent(c(global$replyMethod31, global$dataType),
   {
-    if ((global$dataType == "transcriptions") | (global$dataType=="acousticdata" ))
-      choice <- "Bootstrap"
-
-    if ((global$dataType == "postaggeddata")  | (global$dataType=="distancetable"))
-      choice <- "Noise"
-
-    choices <- c("Largest gap", "Dynamic tree cut", choice, "PAM", "Affinity propagation", "HDBSCAN")
-    updateRadioButtons(session, "replyMethod6", choices = choices, selected = "Dynamic tree cut")
+    s <- isolate(global$replyMethod6)
+                 
+    if (global$replyMethod31!="HDBSCAN")
+    {
+      choice1 <- "Dynamic hybrid cut"
+      if (s=="HDBSCAN") s <- "Dynamic hybrid cut"
+     }
+     else
+     {
+       choice1 <- "HDBSCAN"
+       if (s=="Dynamic hybrid cut") s <- "HDBSCAN"
+     }
+                 
+     if ((global$dataType == "transcriptions") | (global$dataType=="acousticdata" ))
+     {
+       choice2 <- "Bootstrap clustering"
+       if (s=="Noise clustering") s <- "Bootstrap clustering"
+     }
+                 
+     if ((global$dataType == "postaggeddata")  | (global$dataType=="distancetable"))
+     {
+       choice2 <- "Noise clustering"
+       if (s=="Bootstrap clustering") s <- "Noise clustering"
+     }
+                 
+     choices <- c("Largest gap method", "Constant height cut", choice1, choice2)
+     updateRadioButtons(session, "replyMethod6", choices = choices, selected = s)
   })
+  
+  observeEvent(input$replyMethod6,
+  {
+    global$replyMethod6 <- input$replyMethod6
+  })
+
+  removeSingletonClusters <- function(partition)
+  {
+    freq <- table(partition)
+    partition[partition %in% as.numeric(names(freq[freq == 1]))] <- 0
+    
+    nonzero <- sort(unique(partition[partition != 0]))
+    mapping <- setNames(seq_along(nonzero), nonzero)
+    partition[partition != 0] <- mapping[as.character(partition[partition != 0])]
+    
+    return(partition)
+  }
+  
+  # This function was generated using ChatGPT, OpenAI
+  explained_variance_partition <- function(d, labels, noise_label = 0) 
+  {
+    d <- as.matrix(d)
+    
+    # Exclude noise points (label 0)
+    valid_idx <- labels != noise_label
+    labels <- labels[valid_idx]
+    
+    if (length(unique(labels)) < 2)
+      return(0)
+    
+    d <- d[valid_idx, valid_idx]
+    n <- nrow(d)
+    
+    # Total sum of squares
+    ss_total <- sum(d^2) / n
+    
+    # Within-group sum of squares
+    ss_within <- 0
+    for (l in unique(labels)) 
+    {
+      idx <- which(labels == l)
+      if (length(idx) > 1) 
+      {
+        sub_d <- d[idx, idx]
+        ss_within <- ss_within + sum(sub_d^2) / length(idx)
+      }
+    }
+
+    # R-squared
+    r2 <- 1 - (ss_within / ss_total)
+
+    # R-squared adjusted    
+    return(1 - ((1 - r2) * (n - 1)) / (n - length(unique(labels))))
+  }
 
   silhouette_min_dist <- function(dist_matrix, labels, noise_label = 0) 
   {
@@ -6265,17 +6344,15 @@ server <- function(input, output, session)
     if (!is.matrix(dist_matrix)) 
       dist_matrix <- as.matrix(dist_matrix)
 
-    n <- nrow(dist_matrix)
-    
     # Exclude noise points (label 0)
     valid_idx <- labels != noise_label
-    
-    if (length(unique(valid_idx)) == 0)
-      return(NULL)
-    
-    dist_matrix <- dist_matrix[valid_idx, valid_idx]
     labels <- labels[valid_idx]
+    
+    if (length(unique(labels)) < 2)
+      return(NA)
+    
     n_valid <- length(labels)
+    dist_matrix <- dist_matrix[valid_idx, valid_idx]
     
     sil_scores <- numeric(n_valid)
     
@@ -6311,23 +6388,71 @@ server <- function(input, output, session)
     return(round2(mean(sil_scores), 4))
   }
 
+  silhouette_avg_dist <- function(dist_matrix, labels, noise_label = 0) 
+  {
+    # Convert to matrix if needed
+    if (!is.matrix(dist_matrix)) 
+      dist_matrix <- as.matrix(dist_matrix)
+    
+    # Exclude noise points (label 0)
+    valid_idx <- labels != noise_label
+    labels <- labels[valid_idx]
+    
+    if (length(unique(labels)) < 2)
+      return(NA)
+    
+    n_valid <- length(labels)
+    dist_matrix <- dist_matrix[valid_idx, valid_idx]
+    
+    sil_scores <- numeric(n_valid)
+    
+    for (i in 1:n_valid) 
+    {
+      own_cluster <- labels[i]
+      
+      # Intra-cluster distances (excluding self)
+      same_cluster <- which(labels == own_cluster & seq_len(n_valid) != i)
+      if (length(same_cluster) > 0) 
+      {
+        a_i <- mean(dist_matrix[i, same_cluster])
+      } 
+      else 
+      {
+        a_i <- 0  # singleton cluster
+      }
+      
+      # Inter-cluster mean distances
+      other_clusters <- unique(labels[labels != own_cluster])
+      b_i <- Inf
+      
+      for (cl in other_clusters) 
+      {
+        cl_points <- which(labels == cl)
+        b_i <- min(b_i, mean(dist_matrix[i, cl_points]))
+      }
+      
+      # Silhouette formula
+      sil_scores[i] <- ifelse(max(a_i, b_i) == 0, 0, (b_i - a_i) / max(a_i, b_i))
+    }
+    
+    return(round2(mean(sil_scores), 4))
+  }
+
   silhouette_max_dist <- function(dist_matrix, labels, noise_label = 0) 
   {
     # Convert to matrix if needed
     if (!is.matrix(dist_matrix)) 
       dist_matrix <- as.matrix(dist_matrix)
     
-    n <- nrow(dist_matrix)
-    
     # Exclude noise points (label 0)
     valid_idx <- labels != noise_label
-    
-    if (length(unique(valid_idx)) == 0)
-      return(NULL)
-    
-    dist_matrix <- dist_matrix[valid_idx, valid_idx]
     labels <- labels[valid_idx]
+    
+    if (length(unique(labels)) < 2)
+      return(NA)
+    
     n_valid <- length(labels)
+    dist_matrix <- dist_matrix[valid_idx, valid_idx]
     
     sil_scores <- numeric(n_valid)
     
@@ -6363,154 +6488,214 @@ server <- function(input, output, session)
     return(round2(mean(sil_scores), 4))
   }
 
-  silhouette_avg_dist <- function(dist_matrix, labels, noise_label = 0) 
+  # This function was generated using ChatGPT, OpenAI
+  silhouette_wrd_dist <- function(dist_matrix, labels, noise_label = 0) 
   {
     # Convert to matrix if needed
     if (!is.matrix(dist_matrix)) 
       dist_matrix <- as.matrix(dist_matrix)
-
-    n <- nrow(dist_matrix)
-  
+    
     # Exclude noise points (label 0)
     valid_idx <- labels != noise_label
-    
-    if (length(unique(valid_idx)) == 0)
-      return(NULL)
-    
-    dist_matrix <- dist_matrix[valid_idx, valid_idx]
     labels <- labels[valid_idx]
+    
+    if (length(unique(labels)) < 2)
+      return(NA)
+    
     n_valid <- length(labels)
-  
+    dist_matrix <- dist_matrix[valid_idx, valid_idx]
+    
     sil_scores <- numeric(n_valid)
-  
+    
+    # Helper: compute 'Within-cluster sum of squares' (WCSS)) from distance matrix for a set of indices
+    wcss <- function(idx) 
+    {
+      if (length(idx) <= 1) return(0)
+      sub_d <- dist_matrix[idx, idx, drop = FALSE]
+      sum(sub_d^2) / (2 * length(idx))
+    }
+    
     for (i in 1:n_valid) 
     {
       own_cluster <- labels[i]
-
-      # Intra-cluster distances (excluding self)
-      same_cluster <- which(labels == own_cluster & seq_len(n_valid) != i)
-      if (length(same_cluster) > 0) 
-      {
-        a_i <- mean(dist_matrix[i, same_cluster])
-      } 
-      else 
-      {
-        a_i <- 0  # singleton cluster
-      }
-  
-      # Inter-cluster mean distances
-      other_clusters <- unique(labels[labels != own_cluster])
+      same_cluster <- which(labels == own_cluster)
+      
+      # a(i): variance increase if we remove i from own cluster
+      wcss_with <- wcss(same_cluster)
+      wcss_without <- wcss(setdiff(same_cluster, i))
+      a_i <- wcss_with - wcss_without
+      
+      # b(i): smallest variance increase if we add i to another cluster
       b_i <- Inf
-
-      for (cl in other_clusters) 
+      for (cl in setdiff(unique(labels), own_cluster)) 
       {
         cl_points <- which(labels == cl)
-        b_i <- min(b_i, mean(dist_matrix[i, cl_points]))
+        wcss_cl <- wcss(cl_points)
+        wcss_cl_with_i <- wcss(c(cl_points, i))
+        increase <- wcss_cl_with_i - wcss_cl
+        if (increase < b_i) b_i <- increase
       }
-
+        
       # Silhouette formula
       sil_scores[i] <- ifelse(max(a_i, b_i) == 0, 0, (b_i - a_i) / max(a_i, b_i))
     }
-
+    
     return(round2(mean(sil_scores), 4))
+  }
+  
+  dbcv_score <- function(dist_matrix, labels, noise_label = 0) 
+  {
+    # Convert to matrix if needed
+    if (!is.matrix(dist_matrix)) 
+      dist_matrix <- as.matrix(dist_matrix)
+    
+    n <- nrow(dist_matrix)
+    
+    # Exclude noise points (label 0)
+    valid_idx <- labels != noise_label
+    labels <- labels[valid_idx]
+    
+    if (length(unique(labels)) < 2)
+      return(NA)
+    
+    n_valid <- length(labels)
+    dist_matrix <- dist_matrix[valid_idx, valid_idx]
+    
+    result <- dbcv(x=as.dist(dist_matrix), cl=labels, d=nrow(dist_matrix), metric=NULL, sample=NULL)
+
+    return(round2(result$score, 4))
+  }
+
+  silhouette_all_dist <- function(dist_matrix, labels, noise_label = 0)
+  {
+    if (global$replyMethod31==  "Single-Linkage")
+      return(silhouette_min_dist(aggrMat(), labels, 0))
+    
+    if (global$replyMethod31=="Complete-Linkage")
+      return(silhouette_max_dist(aggrMat(), labels, 0))
+    
+    if (global$replyMethod31=="UPGMA")
+      return(silhouette_avg_dist(aggrMat(), labels, 0))
+    
+    if (global$replyMethod31=="WPGMA")
+      return(silhouette_avg_dist(aggrMat(), labels, 0))
+    
+    if (global$replyMethod31=="Ward's")
+      return(silhouette_wrd_dist(aggrMat(), labels, 0))
+    
+    if (global$replyMethod31=="HDBSCAN")
+      return(dbcv_score         (aggrMat(), labels, 0))
   }
 
   observeEvent(c(global$replyMethod31, input$replyMethod6, aggrMat()),
   {
-    global$minPts6 <- NULL          
+    global$clusPar6 <- NULL          
   })
 
-  setMinPts <- function()
+  collapse_runs <- function(df) 
+  {
+    # run-length encoding of y
+    r <- rle(df$score)
+    
+    # map each row to its run
+    idx <- inverse.rle(list(lengths = r$lengths, values  = seq_along(r$values)))
+    
+    # aggregate x by run (using mean), keep y value
+    result <- aggregate(df$number, by = list(run = idx, y = df$score), FUN = mean)
+    
+    # reorder and rename columns
+    colnames(result) <- c("run", "score", "number")
+    result <- result[order(result$number),]
+    
+    return(result)
+  }
+
+  nGroups6 <- function(number, score)
+  {
+    if (input$replyMethod6=="Constant height cut")
+    {
+      last_nonzero <- max(which(score != 0))
+      number <- number[1:last_nonzero]
+      score  <- score [1:last_nonzero]
+      
+      if (length(unique(number)) < 4)
+        return(number[which.max(score)])
+      
+      smooth <- predict(smooth.spline(number, score, spar = 0.5), number)$y
+      model.lm <- lm(smooth~log10(number))
+      
+      return(number[which.max(resid(model.lm))])
+    }
+
+    if ((input$replyMethod6=="Dynamic hybrid cut") | (input$replyMethod6=="HDBSCAN"))
+    {
+      df <- data.frame(number=number, score =score)
+      df <- collapse_runs(df)
+      df$run <- max(df$run) - df$run + 1
+
+      if (length(unique(df$run)) < 4)
+        return(number[which.max(score)])
+            
+      df$smooth <- predict(smooth.spline(df$run, df$score, spar = 0.5), df$run)$y
+      
+      df$change <- 0
+      for (i in 2:(nrow(df)-1))
+      {
+        df$change[i] <- (df$smooth[i] - df$smooth[i-1]) - (df$smooth[i+1] - df$smooth[i])
+      }
+      
+      return(round(df$number[which.max(df$change)]))
+    }
+  }    
+
+  setClusPar <- function()
   {
     req(global$replyMethod31, input$replyMethod6, aggrMat())
     
-    if (((input$replyMethod6=="Dynamic tree cut") | (input$replyMethod6=="HDBSCAN")) & (length(aggrMat()) > 0))
+    if (((input$replyMethod6=="Constant height cut") | (input$replyMethod6=="Dynamic hybrid cut") | (input$replyMethod6=="HDBSCAN")) & (length(aggrMat()) > 0))
     {
-      if (length(global$minPts6)==0)
+      if (length(global$clusPar6)==0)
       {
         n <- ncol(aggrMat())
-        
-        best_score     <- -Inf
-        best_minPts    <- NA
-        best_deepSplit <- NA
-        best_partition <- c()
-        
-        for (minPts in 2:(n-1)) 
+        number <- 2:(n-1)       
+        score  <- rep(0, length(number))
+
+        for (i in number) 
         { 
-          for (deepSplit in 0:4) 
+          if (input$replyMethod6=="Constant height cut")
+            partition <- cutree(tree = clusObj3(), k = i)
+
+          if (input$replyMethod6=="Dynamic hybrid cut")
+            partition <- cutreeDynamic(dendro         = clusObj3(),
+                                       distM          = as.matrix(aggrMat()),
+                                       method         = "hybrid",
+                                       deepSplit      = 1,
+                                       minClusterSize = i,
+                                       verbose        = 0)
+            
+          if (input$replyMethod6=="HDBSCAN")
           {
-            if (input$replyMethod6=="Dynamic tree cut")
-              partition <- cutreeDynamic(dendro         = clusObj3(),
-                                         distM          = as.matrix(aggrMat()),
-                                         method         = "hybrid",
-                                         deepSplit      = deepSplit,
-                                         minClusterSize = minPts,
-                                         verbose        = 0)
-
-            if (input$replyMethod6=="HDBSCAN")
-            {
-              result <- hdbscan(as.dist(aggrMat()), minPts = minPts)
-              partition <- result$cluster
-            }
-
-            partition0 <- partition        
-            partition  <- partition[partition!=0]
-
-            if (length(unique(partition)) > 0)
-            {
-              if ((input$replyMethod6=="Dynamic tree cut") & (global$replyMethod31==  "Single-Linkage"))
-                score <- silhouette_min_dist(aggrMat(), partition0, 0)
-
-              if ((input$replyMethod6=="Dynamic tree cut") & (global$replyMethod31=="Complete-Linkage"))
-                score <- silhouette_max_dist(aggrMat(), partition0, 0)
-
-              if ((input$replyMethod6=="Dynamic tree cut") & (global$replyMethod31=="UPGMA"))
-                score <- silhouette_avg_dist(aggrMat(), partition0, 0)
-                
-              if ((input$replyMethod6=="Dynamic tree cut") & (global$replyMethod31=="WPGMA"))
-                score <- silhouette_avg_dist(aggrMat(), partition0, 0)
-                
-              if ((input$replyMethod6=="Dynamic tree cut") & (global$replyMethod31=="Ward's"))
-                score <- silhouette_avg_dist(aggrMat(), partition0, 0)    
-
-              if  (input$replyMethod6=="HDBSCAN")
-              {
-              # sizes <- as.numeric(table(partition))           
-              # score <- weighted.mean(result$cluster_scores, sizes)
-                score <- silhouette_avg_dist(aggrMat(), partition0, 0)
-              }
-
-              if (is.na(score))
-                next
-
-              if (score > best_score) 
-              {
-                best_score     <- score
-                best_minPts    <- minPts
-                best_deepSplit <- deepSplit
-                best_partition <- partition0
-              }
-            }
-
-            if (input$replyMethod6=="HDBSCAN")
-              break;
+            result <- hdbscan(as.dist(aggrMat()), minPts = i)
+            partition <- result$cluster
           }
+
+          partition <- removeSingletonClusters(partition)
+
+          if (length(unique(partition)) == 0)
+            next
+
+          score[i-1] <- explained_variance_partition(aggrMat(), partition, 0)
         }
-        
-        global$minPts6    <- best_minPts
-        global$deepSplit6 <- best_deepSplit
+
+        global$clusPar6 <- nGroups6(number, score)
       }
       else
-        global$minPts6    <- isolate(input$minPts6)
+        global$clusPar6 <- isolate(input$clusPar6)
     }
   }
 
-  observeEvent(global$minPts6,
-    updateNumericInput(
-      session = session,
-      inputId = 'minPts6',
-      value   = isolate(global$minPts6)
-    )
+  observeEvent(global$clusPar6,
+    updateNumericInput(session = session, inputId = 'clusPar6', value = isolate(global$clusPar6))
   )
 
   observeEvent(input$goButton6,
@@ -6561,29 +6746,16 @@ server <- function(input, output, session)
       write_tsv(df, file = paste0(tempDir, "individual.tsv"), col_names = T, quote = "none", escape = "none")
     }
 
-    Partition0 <- function()
+    Partition1 <- function()
     {
       if (file.exists(paste0(   tempDir, "partition.csv")))
         system(paste0("rm -f ", tempDir, "partition.csv"))
 
-      if (input$replyMethod6=="Largest gap")
+      if (input$replyMethod6=="Largest gap method")
         partition <- cutree(clusObj3(), nGroups(clusObj3()))
 
-      if (input$replyMethod6=="PAM")
-      {
-        result <- pamk(as.dist(aggrMat()), krange=2:(nrow(aggrMat())-1), usepam=TRUE, diss = TRUE)
-        partition <- as.numeric(result$pamobject$clustering)
-      }
-
-      freq <- table(partition)
-      partition[partition %in% as.numeric(names(freq[freq == 1]))] <- 0
-        
-      nonzero <- sort(unique(partition[partition != 0]))
-      mapping <- setNames(seq_along(nonzero), nonzero)
-      partition[partition != 0] <- mapping[as.character(partition[partition != 0])]
-        
       df <-  data.frame(
-        cluster = partition,
+        cluster = removeSingletonClusters(partition),
         variety = colnames(aggrMat())
       )
 
@@ -6594,7 +6766,40 @@ server <- function(input, output, session)
       )
     }
 
-    Partition1 <- function()
+    Partition2 <- function()
+    {
+      setClusPar()
+      
+      if (file.exists(paste0(   tempDir, "partition.csv")))
+        system(paste0("rm -f ", tempDir, "partition.csv"))
+
+      if (input$replyMethod6=="Constant height cut")
+        partition <- cutree(clusObj3(), global$clusPar6)
+      
+      if (input$replyMethod6=="Dynamic hybrid cut")
+        partition <- cutreeDynamic(dendro         = clusObj3(),
+                                   distM          = as.matrix(aggrMat()),
+                                   method         = "hybrid",
+                                   deepSplit      = 1,
+                                   minClusterSize = global$clusPar6,
+                                   verbose        = 0)
+      
+      if (input$replyMethod6=="HDBSCAN")
+        partition <- hdbscan(as.dist(aggrMat()), minPts = global$clusPar6)$cluster
+      
+      df <-  data.frame(
+        cluster = removeSingletonClusters(partition),
+        variety = colnames(aggrMat())
+      )
+      
+      write_csv(df, paste0(tempDir, "partition.csv"), col_names = F)
+      
+      global$background6 <- r_bg(
+        func = function(){return(NULL)}
+      )
+    }
+    
+    Partition3 <- function()
     {
       if (global$replyMethod31==  "Single-Linkage")
         methodc <- 1
@@ -6614,13 +6819,17 @@ server <- function(input, output, session)
         
       if (global$replyMethod31=="Ward's")
         methodc <- 7
-      else {}
-        
-      if ( input$replyMethod6 =="Bootstrap")
+      else
+      {
+        showNotification(paste0(input$replyMethod6, " not available for ", global$replyMethod31, "!"), type = "message", duration = NULL)
+        return(NULL)
+      }
+
+      if ( input$replyMethod6 =="Bootstrap clustering")
         methodr <- 1
       else
         
-      if ( input$replyMethod6 =="Noise")
+      if ( input$replyMethod6 =="Noise clustering")
         methodr <- 2
       else {}
 
@@ -6643,84 +6852,19 @@ server <- function(input, output, session)
       )
     }
 
-    Partition2 <- function()
-    {
-      if (file.exists(paste0(   tempDir, "partition.csv")))
-        system(paste0("rm -f ", tempDir, "partition.csv"))
-
-      if (input$replyMethod6=="Affinity propagation")
-      {
-        result <- apcluster(s=max(aggrMat()) - aggrMat())
-        
-        df <-  data.frame(
-          cluster = 0,  
-          variety = colnames(aggrMat())
-        )
-        
-        for (i in 1:nrow(df))
-        {
-          for (j in 1:length(result@clusters))
-          {
-            if (is.element(i, result@clusters[[j]]))
-              df$cluster[i] <- j
-          }
-        }
-      }
-      
-      write_csv(df, paste0(tempDir, "partition.csv"), col_names = F)
-
-      global$background6 <- r_bg(
-        func = function(){return(NULL)}
-      )
-    }
-    
-    Partition3 <- function()
-    {
-      setMinPts()
-      
-      if (file.exists(paste0(   tempDir, "partition.csv")))
-        system(paste0("rm -f ", tempDir, "partition.csv"))
-
-      if (input$replyMethod6=="Dynamic tree cut")
-        partition <- cutreeDynamic(dendro         = clusObj3(),
-                                   distM          = as.matrix(aggrMat()),
-                                   method         = "hybrid",
-                                   deepSplit      = global$deepSplit6,
-                                   minClusterSize = global$minPts6,
-                                   verbose        = 0)
-
-      if  (input$replyMethod6=="HDBSCAN")
-        partition <- hdbscan(as.dist(aggrMat()), minPts = global$minPts6)$cluster
-
-      df <-  data.frame(
-        cluster = partition,
-        variety = colnames(aggrMat())
-      )
-
-      write_csv(df, paste0(tempDir, "partition.csv"), col_names = F)
-      
-      global$background6 <- r_bg(
-        func = function(){return(NULL)}
-      )
-    }
-
-    if ((input$replyMethod6=="Largest gap") |
-        (input$replyMethod6=="PAM"))
-      Partition0()
+    if  (input$replyMethod6=="Largest gap method")
+      Partition1()
     else 
 
-    if ((input$replyMethod6=="Bootstrap") | 
-        (input$replyMethod6=="Noise"))
-      Partition1()  
+    if ((input$replyMethod6=="Constant height cut") |
+        (input$replyMethod6=="Dynamic hybrid cut")  |
+        (input$replyMethod6=="HDBSCAN"))
+      Partition2()
     else
       
-    if  (input$replyMethod6=="Affinity propagation")
-      Partition2()
-    else 
-      
-    if ((input$replyMethod6=="Dynamic tree cut") | 
-        (input$replyMethod6=="HDBSCAN"))
-      Partition3()
+    if ((input$replyMethod6=="Bootstrap clustering") | 
+        (input$replyMethod6=="Noise clustering"))
+      Partition3()  
     else {}
   })
 
@@ -6754,12 +6898,11 @@ server <- function(input, output, session)
 
       showNotification(paste(nClass, "varieties out of", nAll, "are classified into", nGroups, "groups."), type = "message", duration = NULL)
 
-      silhMin <- silhouette_min_dist(dist_matrix=as.dist(aggrMat()), labels=global$partition$V1, noise_label=0)
-      silhMax <- silhouette_max_dist(dist_matrix=as.dist(aggrMat()), labels=global$partition$V1, noise_label=0)
-      silhAvg <- silhouette_avg_dist(dist_matrix=as.dist(aggrMat()), labels=global$partition$V1, noise_label=0)
-      showNotification(paste0("Silhouette: ", silhMin, " (min. dist.), ", silhMax, " (max. dist.), ", silhAvg, " (avg. dist.)"), type = "message", duration = NULL)
+      evp <- explained_variance_partition(as.dist(aggrMat()), global$partition$V1, 0)
+      explVar <- formatC(x=round2(evp * 100, n=1), digits = 1, format = "f")
 
-      cat("minimum cluster size: ", global$minPts6, " deepSplit: ", global$deepSplit6, "\n")
+      contentOfMessage <- paste0("Variance explained by ", global$replyMethod31, " with ", input$replyMethod6, ": ", explVar, "%.")
+      showNotification(contentOfMessage, type = "message", duration = NULL)                     
 
       insertUI(
         selector = "#goButton",
@@ -6777,7 +6920,7 @@ server <- function(input, output, session)
   {
     req(input$replyMethod6)
 
-    if ((input$replyMethod6=="Bootstrap") | (input$replyMethod6=="Noise"))
+    if ((input$replyMethod6=="Bootstrap clustering") | (input$replyMethod6=="Noise clustering"))
     {
       tagList(
         bsButton("butNumIter6", label = NULL, icon = icon("info"), size = "extra-small"),
@@ -6804,34 +6947,54 @@ server <- function(input, output, session)
     global$numIter6 <- input$numIter6
   })
 
-  output$minPts6 <- renderUI(
+  output$clusPar6 <- renderUI(
   {
     req(input$replyMethod6)
       
-    if ((input$replyMethod6=="Dynamic tree cut") | (input$replyMethod6=="HDBSCAN"))
+    if ((input$replyMethod6=="Constant height cut") | (input$replyMethod6=="Dynamic hybrid cut") | (input$replyMethod6=="HDBSCAN"))
     {
-      if (length(isolate(global$minPts6)) > 0)
-        v <- isolate(global$minPts6)
+      if (length(isolate(global$clusPar6)) > 0)
+        v <- isolate(global$clusPar6)
       else
         v <- NULL
       
-      tagList(
-        bsButton("butMinPts6", label = NULL, icon = icon("info"), size = "extra-small"),
-        bsModal ("modMinPts6", "Minimum cluster size", "butMinPts6", size = "large", "Dit is de helptekst"),
+      if (input$replyMethod6=="Constant height cut")
+        return(tagList(
+          bsButton("butClusPar6", label = NULL, icon = icon("info"), size = "extra-small"),
+          bsModal ("modClusPar6", "Number of clusters", "butClusPar6", size = "large", "Dit is de helptekst"),
+         
+          HTML("<span style='font-weight: bold;'>&nbsp;Number of clusters:</span>"),
+          div(style='height: 12px'),
+          div(style='margin-left: 60px', numericInput(
+            inputId = "clusPar6",
+            label   = NULL,
+            value   = v,
+            min     = 2,
+            max     = NA,
+            step    = 1,
+            width   = "100px")),
+         
+          br()
+       ))
+      
+      if ((input$replyMethod6=="Dynamic hybrid cut") | (input$replyMethod6=="HDBSCAN")) 
+        return(tagList(
+          bsButton("butClusPar6", label = NULL, icon = icon("info"), size = "extra-small"),
+          bsModal ("modClusPar6", "Minimum cluster size", "butClusPar6", size = "large", "Dit is de helptekst"),
           
-        HTML("<span style='font-weight: bold;'>&nbsp;Minimum cluster size:</span>"),
-        div(style='height: 12px'),
-        div(style='margin-left: 60px', numericInput(
-          inputId = "minPts6",
-          label   = NULL,
-          value   = v,
-          min     = 2,
-          max     = NA,
-          step    = 1,
-          width   = "100px")),
+          HTML("<span style='font-weight: bold;'>&nbsp;Minimum cluster size:</span>"),
+          div(style='height: 12px'),
+          div(style='margin-left: 60px', numericInput(
+            inputId = "clusPar6",
+            label   = NULL,
+            value   = v,
+            min     = 2,
+            max     = NA,
+            step    = 1,
+            width   = "100px")),
           
-        br()
-      )
+          br()
+      ))
     }
   })
 
