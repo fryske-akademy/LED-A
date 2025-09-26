@@ -1,7 +1,15 @@
-version: "3"
+version: "3.7"
 services:
-  shiny:
-    image: led-a
-    build: .
-    ports:
-      - "3838:3838"
+    led-a:
+       image: "${APPNAME}:${VERSION}"
+       deploy:
+          replicas: 1
+          resources:
+             limits:
+                memory: "3GB"
+       ports:
+          - "10004:3838"
+       networks:
+          - ${APPNAME}
+networks:
+    led-a:
