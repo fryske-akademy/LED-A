@@ -1,15 +1,23 @@
 version: "3.7"
+
 services:
-    led-a:
-       image: "${APPNAME}:${VERSION}"
-       deploy:
-          replicas: 1
-          resources:
-             limits:
-                memory: "3GB"
-       ports:
-          - "10004:3838"
-       networks:
-          - ${APPNAME}
+  led-a:
+    image: "led-a:latest"
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: "3G"
+      restart_policy:
+        condition: on-failure
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3838 || exit 1"]
+    ports:
+       - "10004:3838"
+    networks:
+       - led-a
+
 networks:
-    led-a:
+  led-a:
+    driver: overlay
+    attachable: true
