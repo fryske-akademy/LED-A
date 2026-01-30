@@ -2,43 +2,20 @@
 FROM rocker/shiny:4.5.1
 
 # Install system dependencies
-RUN apt-get update
-RUN apt-get install -y libcurl4-openssl-dev
-RUN apt-get install -y curl
-RUN apt-get install -y libssl-dev
-RUN apt-get install -y libxml2-dev
-RUN apt-get install -y libicu-dev
-RUN apt-get install -y libudunits2-dev
-RUN apt-get install -y zlib1g-dev
-RUN apt-get install -y libwebp-dev
-RUN apt-get install -y libpoppler-cpp-dev
-RUN apt-get install -y pkg-config
-RUN apt-get install -y libtesseract-dev
-RUN apt-get install -y libleptonica-dev
-RUN apt-get install -y libprotobuf-dev
-RUN apt-get install -y protobuf-compiler
-RUN apt-get install -y glpk-utils
-RUN apt-get install -y libglpk-dev
-RUN apt-get install -y libgdal-dev
-RUN apt-get install -y libfontconfig1-dev
-RUN apt-get install -y libcairo2-dev
-RUN apt-get install -y libxt-dev
-RUN apt-get install -y texlive-full
-RUN apt-get install -y libharfbuzz-dev
-RUN apt-get install -y libfribidi-dev
-RUN apt-get install -y libx11-dev
-RUN apt-get install -y libfontconfig1
-RUN apt-get install -y fpc
-RUN apt-get install -y gcc
-RUN apt-get install -y make
+RUN apt-get update && apt-get install -y libcurl4-openssl-dev curl \
+libssl-dev libxml2-dev libicu-dev libudunits2-dev zlib1g-dev libwebp-dev \
+libpoppler-cpp-dev pkg-config libtesseract-dev libleptonica-dev \
+libprotobuf-dev protobuf-compiler glpk-utils libglpk-dev libgdal-dev \
+libfontconfig1-dev libcairo2-dev libxt-dev texlive-full libharfbuzz-dev \
+libfribidi-dev libx11-dev libfontconfig1 fonts-liberation fpc gcc make
 
-RUN apt-get install -y fonts-liberation
-RUN wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-RUN dpkg -i google-chrome-stable_current_amd64.deb || apt-get install -fy
+# Install Google Chrome from https://mirror.cs.uchicago.edu/google-chrome/pool/main/g/google-chrome-stable/
+RUN wget https://mirror.cs.uchicago.edu/google-chrome/pool/main/g/google-chrome-stable/google-chrome-stable_140.0.7339.127-1_amd64.deb
+RUN dpkg -i google-chrome-stable_140.0.7339.127-1_amd64.deb || apt-get install -fy
 ENV CHROMOTE_CHROME=/usr/bin/google-chrome
-RUN rm -rf /var/lib/apt/lists/*
+RUN apt-get clean && rm *.deb && rm -rf /var/lib/apt/lists/*
 
-# Copy your app to the container
+# Copy Shiny app and custom config to the container
 COPY ./ /srv/shiny-server/
 
 # Move custom config into place
@@ -48,69 +25,26 @@ RUN mv /srv/shiny-server/shiny-server.conf /etc/shiny-server/shiny-server.conf
 RUN chown -R shiny:shiny /srv/shiny-server
 
 # Install R package dependencies
-RUN R -e "install.packages('shiny',             dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('shinyBS',           dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('shinyWidgets',      dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('shinyjqui',         dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('shinysky',          dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('readr',             dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('openxlsx',          dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('stringr',           dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('fs',                dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('plyr',              dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('ipa',               dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('tuneR',             dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('proxy',             dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('dtw',               dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('udpipe',            dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('ggplot2',           dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('ggh4x',             dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('ggrepel',           dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('deldir',            dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('ggdendro',          dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('dynamicTreeCut',    dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('dbscan',            dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('fpc',               dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('MASS',              dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('pcaPP',             dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('geodist',           dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('colouR',            dependencies=TRUE , repos='https://cloud.r-project.org/')"
+RUN R -e "install.packages(c('shiny', 'shinyBS', 'shinyWidgets', 'shinyjqui', \
+'shinysky', 'readr', 'openxlsx', 'stringr', 'fs', 'plyr', 'ipa', 'seewave', \
+'tuneR', 'proxy', 'dtw', 'udpipe', 'ggplot2', 'ggh4x', 'ggrepel', 'deldir', \
+'ggdendro', 'dynamicTreeCut', 'dbscan', 'fpc', 'MASS', 'pcaPP', 'geodist', \
+'colouR', 'crosstalk', 'htmltools', 'htmlwidgets', 'jquerylib', 'leaflet.providers', \
+'magrittr', 'methods', 'png', 'raster', 'RColorBrewer', 'rlang', 'scales', \
+'sf', 'viridisLite', 'xfun', 'leaflet', 'leaflet.extras', 'Rtsne', 'grid', 'dplyr', \
+'svglite', 'Cairo', 'tikzDevice', 'htmlwidgets', 'webshot2', 'callr', 'remotes', \
+'RJSONIO'))"
 
-RUN R -e "install.packages('crosstalk',         dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('htmltools',         dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('htmlwidgets',       dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('jquerylib',         dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('leaflet.providers', dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('magrittr',          dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('methods',           dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('png',               dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('raster',            dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('RColorBrewer',      dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('rlang',             dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('scales',            dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('sf',                dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('viridisLite',       dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('xfun',              dependencies=TRUE , repos='https://cloud.r-project.org/')"
+# Install naturalearch packages
+RUN R -e 'install.packages(c("rnaturalearth", "rnaturalearthdata")); \
+    options(timeout = 300); \
+    if (!requireNamespace("remotes", quietly = TRUE)) install.packages("remotes"); \
+    tryCatch( \
+        remotes::install_github("ropensci/rnaturalearthhires", quiet = TRUE, upgrade = "never", dependencies = TRUE), \
+        error=function(e) message("Failed to install rnaturalearthhires from GitHub, continuing without it") \
+    )'
 
-RUN R -e "install.packages('leaflet',           dependencies=FALSE, repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('leaflet.extras',    dependencies=FALSE, repos='https://cloud.r-project.org/')"
-
-RUN R -e "install.packages('Rtsne',             dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('grid',              dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('dplyr',             dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('svglite',           dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('Cairo',             dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('tikzDevice',        dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('htmlwidgets',       dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('webshot2',          dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "install.packages('callr',             dependencies=TRUE , repos='https://cloud.r-project.org/')"
-
-RUN R -e "install.packages('remotes',           dependencies=TRUE , repos='https://cloud.r-project.org/')"
-RUN R -e "remotes::install_github('ropensci/rnaturalearth'     )"
-RUN R -e "remotes::install_github('ropensci/rnaturalearthdata' )"
-RUN R -e "remotes::install_github('ropensci/rnaturalearthhires')"
-
-RUN R -e "install.packages('RJSONIO',           dependencies=TRUE , repos='https://cloud.r-project.org/')"
+# Install shinysky package
 RUN R -e "install.packages('/srv/shiny-server/shinysky_0.1.3.tar.gz', repos=NULL, type='source')"
 
 # Set working directory
@@ -126,5 +60,5 @@ RUN gcc -s -Wall -o robust robust.c -lm
 # Expose the Shiny port
 EXPOSE 3838
 
-# Run the Shiny app
-CMD ["/usr/bin/shiny-server"]
+# Clean up any leftover Chrome sessions before starting Shiny
+CMD ["/bin/bash", "-c", "pkill chrome || true && pkill chromedriver || true && /usr/bin/shiny-server"]
