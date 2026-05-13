@@ -9,6 +9,7 @@ library(stringr)
 library(fs)
 library(plyr)
 library(ipa)
+library(seewave)
 library(tuneR)
 library(proxy)
 library(dtw)
@@ -390,7 +391,7 @@ ui <- tagList(
           fluidPage(
             style = "margin-left: 120px",
             
-            bsButton("butGebTab1", label = NULL, icon = icon("info"), size = "extra-small"),
+            bsButton("butGenTab1", label = NULL, icon = icon("info"), size = "extra-small"),
             bsModal ("modGenTab1", "Upload table with coordinates", "butGenTab1", size = "large", "Dit is de helptekst"),
             
             HTML("<span style='font-weight: bold;'>&nbsp;Upload table with genders (recommended):</span>"),
@@ -415,7 +416,30 @@ ui <- tagList(
           
           uiOutput('geoTab1'),
 
-          # Comparison method
+          ### Number of MFCC coefficients
+          
+          fluidPage(
+            style = "margin-left: 120px",
+          
+            bsButton("butNumMFCC", label = NULL, icon = icon("info"), size = "extra-small"),
+            bsModal ("modNumMFCC", "Number of MFCC coefficients", "butNumMFCC", size = "large", "Dit is de helptekst"),
+          
+            HTML("<span style='font-weight: bold;'>&nbsp;Number of MFCC coefficients:</span>"),
+            div(style='height: 12px'),
+            div(style='margin-left: 64px', numericInput(
+              inputId = "numMFCC",
+              label   = NULL,
+              value   = 9,
+              min     = 3,
+              max     = NA,
+              step    = 1,
+              width   = "84px"
+            ))
+          ),
+
+          br(),
+
+          ### Comparison method
 
           fluidPage(
             style = "margin-left: 120px",
@@ -938,6 +962,9 @@ ui <- tagList(
           uiOutput("beamWeight"   ),
           uiOutput("networkWeight"),
 
+          uiOutput("beamColors"   ),
+          uiOutput("networkColors"),
+
           uiOutput("selRGB") ,
           uiOutput("selRef") ,
           
@@ -1127,7 +1154,7 @@ ui <- tagList(
           style = "min-height: 601px;",
 
           h5(strong("About")),
-          p(HTML("LED-A stands for 'Levenshtein Edit Distance App.' It is a web app for calculating and visualizing linguistic distances among dialect varieties using the Relative Identity Distance, Levenshtein distance, Dynamic Time Warping, and the POS-tag <i>n</i>-gram frequency method. The following people were involved in the development of LED-A: Wilbert Heeringa (implementation), Vincent van Heuven (advice), Hans Van de Velde (project manager). LED-A is still under development. Comments are welcome and can be sent to"), img(src = 'e-mail.png', height = 20, align = "center"),"."),
+          p(HTML("LED-A stands for 'Levenshtein Edit Distance App.' It is a web app for calculating and visualizing linguistic distances among dialect varieties using the Relative Identity Distance, Levenshtein distance, Dynamic Time Warping, and the POS-tag <i>n</i>-gram frequency method. The following people were involved in the development of LED-A: Wilbert Heeringa (implementation), Vincent van Heuven† (advice), Hans Van de Velde (project manager). LED-A is still under development. Comments are welcome and can be sent to"), img(src = 'e-mail.png', height = 20, align = "center"),"."),
           br(),
 
           h5(strong("How to cite this app")),
@@ -1168,10 +1195,11 @@ ui <- tagList(
             tags$li(tags$span(HTML("<span style='color:blue'>proxy</span>"), p("Meyer D, Buchta C (2022). _proxy: Distance and Similarity Measures_. URL: https://doi:10.32614/CRAN.package.proxy."))),
             tags$li(tags$span(HTML("<span style='color:blue'>readr</span>"), p("Wickham H, Hester J, Bryan J (2023). _readr: Read Rectangular Text Data_. URL: https://CRAN.R-project.org/package=readr."))),
             tags$li(tags$span(HTML("<span style='color:blue'>rnaturalearth</span>"), p("Massicotte P, South A (2023). _rnaturalearth: World Map Data from Natural Earth_. URL: https://CRAN.R-project.org/package=rnaturalearth."))),
-            tags$li(tags$span(HTML("<span style='color:blue'>rnaturalearthdata</span>"), p("South A (2017). _rnaturalearthdata: World Vector Map Data from Natural Earth Used in 'rnaturalearth'_. URL: https://CRAN.R-project.org/package=rnaturalearthdata."))),
+            tags$li(tags$span(HTML("<span style='color:blue'>rnaturalearthdata</span>"), p("South A (2017). rnaturalearthdata: World Vector Map Data from Natural Earth Used in 'rnaturalearth'. URL: https://CRAN.R-project.org/package=rnaturalearthdata."))),
             tags$li(tags$span(HTML("<span style='color:blue'>Rtsne</span>"), p("L.J.P. van der Maaten and G.E. Hinton (2008). Visualizing High-Dimensional Data Using t-SNE. Journal of Machine Learning Research 9(Nov):2579-2605.", br(),
-                                                                               "L.J.P. van der Maaten (2014). Accelerating t-SNE using Tree-Based Algorithms.   Journal of Machine Learning Research 15(Oct):3221-3245.", br(),
+                                                                               "L.J.P. van der Maaten (2014). Accelerating t-SNE using Tree-Based Algorithms. Journal of Machine Learning Research 15(Oct):3221-3245.", br(),
                                                                                "Jesse H. Krijthe (2015). Rtsne: T-Distributed Stochastic Neighbor Embedding using a Barnes-Hut Implementation. URL: https://github.com/jkrijthe/Rtsne."))),
+            tags$li(tags$span(HTML("<span style='color:blue'>seewave</span>"), p("J. Sueur, T. Aubin, C. Simonis (2008). Seewave: a free modular tool for sound analysis and synthesis. Bioacoustics, 18: 213-226."))),
             tags$li(tags$span(HTML("<span style='color:blue'>shiny</span>"), p("Chang W, Cheng J, Allaire J, Sievert C, Schloerke B, Xie Y, Allen J, McPherson J, Dipert A, Borges B (2023). _shiny: Web Application Framework for R_. URL: https://CRAN.R-project.org/package=shiny."))),
             tags$li(tags$span(HTML("<span style='color:blue'>shinyBS</span>"), p("Bailey E (2022). _shinyBS: Twitter Bootstrap Components for Shiny_. URL: https://CRAN.R-project.org/package=shinyBS."))),
             tags$li(tags$span(HTML("<span style='color:blue'>shinyjqui</span>"), p("Tang Y (2022). _shinyjqui: 'jQuery UI' Interactions and Effects for Shiny_. URL: https://CRAN.R-project.org/package=shinyjqui."))),
@@ -1301,13 +1329,13 @@ ui <- tagList(
           h5(strong("Reeks Nederlands Dialectatlassen -- Dutch")),
 
           a("RND Dutch",
-            href = "datasets1/DutchRND050.xlsx",
+            href = "datasets1/DutchRND051.xlsx",
             target = "_blank"),
 
           br(),
 
           a("RND Dutch coordinates",
-            href = "datasets1/DutchRND050_GeoHack.xlsx",
+            href = "datasets1/DutchRND051_GeoHack.xlsx",
             target = "_blank"),
 
           br(), br(),
@@ -1492,7 +1520,7 @@ ui <- tagList(
           tags$div(tags$ul
           (
             tags$li(tags$div(style="padding: 5px;", "The installer provided on this page has been tested under Windows 10.")),
-            tags$li(tags$div(style="padding: 5px;", "Click", a(strong("here"), href="https://frisian.eu/Install%20LED-A.exe", target = "_blank"), "in order to download the installer.")),
+            tags$li(tags$div(style="padding: 5px;", "Click", a(strong("here"), href="https://frisian.eu/downloads/Install%20LED-A.exe", target = "_blank"), "in order to download the installer.")),
             tags$li(tags$div(style="padding: 5px;", "Save the installer file in the Downloads or Desktop folder and double-click on it. Then follow the installation procedure.")),
             tags$li(tags$div(style="padding: 5px;", "Under", strong('Select Destination Location'), "click on", strong('Next'), ".")),
             tags$li(tags$div(style="padding: 5px;", "Under", strong('Select Additional Tasks'), "check", strong('Create a desktop shortcut'), "(important!)")),
@@ -1548,23 +1576,47 @@ ui <- tagList(
 server <- function(input, output, session)
 {
   homeDir <- list.dirs("/home", full.names = TRUE, recursive = FALSE)[1]
-  homeDir <- paste0(homeDir, "/temp/")
-
-  tempDir <- sub("/tmp/", homeDir, tempdir())
-  tempDir <- paste0(tempDir, "/", session$token, "/")
+  tempDir <- paste0(homeDir, "/temp/", session$token, "/")
   
   dir.create(tempDir, showWarnings = FALSE, recursive = TRUE)
   Sys.setenv(TMPDIR = tempDir)
 
   session$onSessionEnded(function()
   {
-    tryCatch(
-      expr  = if (dir.exists(tempDir))
-        unlink(tempDir, recursive = TRUE, force = TRUE),
-      error = function(e)
-        warning("Failed to delete temp dir: ", conditionMessage(e))
-    )
+    if (dir.exists(tempDir))
+    {
+      unlink(tempDir, recursive = TRUE, force = TRUE)
+    }
   })
+
+  onStop(function() 
+  {
+    if (dir.exists(tempDir)) 
+    {
+      unlink(tempDir, recursive = TRUE, force = TRUE)
+    }
+  })
+
+  session$onSessionEnded(function()
+  {
+    for (nm in c("background", "background6")) 
+    {
+      bg <- isolate(global[[nm]])
+      
+      if (!is.null(bg)) 
+      {
+        try(bg$kill(), silent = TRUE)
+        global[[nm]] <- NULL
+        cat(sprintf("Killed %s on session end.\n", nm))
+      }
+    }
+  })
+
+  stop_if_running <- function(bg) 
+  {
+    if (!is.null(bg)) 
+      try(bg$kill(), silent = TRUE)
+  }
 
   ##############################################################################
   
@@ -1639,7 +1691,7 @@ server <- function(input, output, session)
     replyMethod31    = "UPGMA",
     replyMethod32    = "Kruskal's",
     replyMethod6     = "Constant height cut",
-    
+
     nColGroups       = NULL,
     showLegend       = FALSE,
     legendLabels     = NULL,
@@ -1655,6 +1707,9 @@ server <- function(input, output, session)
     beamWeight       = 4,
     networkWeight    = 4,
 
+    beamColors5      = FALSE,
+    networkColors5   = FALSE,
+    
     selR             = "1",
     selG             = "2",
     selB             = "3",
@@ -1678,7 +1733,9 @@ server <- function(input, output, session)
     numIter6         = 1000,
     clusPar6         = NULL,
     deepSplit6       = NULL,
-    partition        = NULL
+    partition        = NULL,
+
+    sampleRate       = NULL
   )
 
   ##############################################################################
@@ -2660,9 +2717,11 @@ server <- function(input, output, session)
         )
       }
 
+      stop_if_running(global$background)
       global$background <- r_bg(
-        func = System2,
-        args = list(saveIn, saveAg, tempDir)
+        func      = System2,
+        args      = list(saveIn, saveAg, tempDir),
+        supervise = TRUE
       )
     }
 
@@ -2717,9 +2776,11 @@ server <- function(input, output, session)
         )
       }
 
+      stop_if_running(global$background)
       global$background <- r_bg(
-        func = System2,
-        args = list(levMeth, normAli, selPart, saveSO, saveAl, saveIn, saveAg, tempDir)
+        func      = System2,
+        args      = list(levMeth, normAli, selPart, saveSO, saveAl, saveIn, saveAg, tempDir),
+        supervise = TRUE
       )
     }
 
@@ -2895,7 +2956,7 @@ server <- function(input, output, session)
           if (!is.na(df[i,j]) &  is.na(df[j,j]))
             d <- df[i,j]
           else
-            
+
           if ( is.na(df[i,j]) & !is.na(df[j,j]))
             d <- df[j,i]
           else
@@ -3145,30 +3206,81 @@ server <- function(input, output, session)
     )
   })  
 
-  standardize <- function(m)
+  checkSampleRate <- function(varieties, items)
   {
-    for (i in 1:ncol(m))
+    minSampleRate <- Inf
+    
+    for (i in 1:length(varieties))
     {
-      m[,i] <- (m[,i]-mean(m[,i]))/sd(m[,i])
+      for (k in 1:length(items))
+      {
+        if (input$dataForm1=="1")
+          s <- paste0(varieties[i], "_", items[k], ".wav")
+        
+        if (input$dataForm1=="2")
+          s <- paste0(varieties[i], ".", items[k])
+        
+        index <- which(input$dataTab1$name==s)
+        
+        if (length(index)==1)
+        {
+          s0 <- input$dataTab1$datapath[index]
+          wav <- readWave(s0)
+          
+          if (wav@samp.rate < minSampleRate)
+            minSampleRate <- wav@samp.rate
+        }
+      }
+      
+      if (!is.null(global$idNot)) removeNotification(global$idNot)
+      global$idNot <- showNotification(HTML(paste0("Checking sample rates, ", round((i/length(varieties))*100), "% done.")), type = "message", duration = NULL)
     }
     
-    return(m)
+    cat("Sample rate: ", minSampleRate, "\n")
+    global$sampleRate <- minSampleRate     
   }
-  
+
   snd2MFCC <- function(s0, s)
   {
-    w <- readWave(s0)
-    
-    if ((length(w@left) / w@samp.rate) > 0.05)
+    # Read sound file
+    wav <- readWave(s0)
+
+    # If stereo convert to mono
+    if (nchannel(wav)==2)
     {
-      m <- na.omit(melfcc(w, numcep =  9, minfreq = 50, maxfreq = 5000, nbands = 32))
-      m <- standardize(m)
-      write.table(m, file = paste0(tempDir, s), quote = F, row.names = F, col.names = T, sep=",")
+      wav <- mono(wav, which = "both")
+    }
+
+    # Check sample rate
+    if (wav@samp.rate != global$sampleRate) 
+    {
+      wav <- resamp(wav, f = wav@samp.rate, g = global$sampleRate, output = "Wave")
+    }
+
+    # Noise reduction
+    wav <- rmnoise(wav, f = wav@samp.rate, channel = 1, output = "Wave")
+    
+    if (duration(wav) > 0.05)
+    {
+      # Extract MFCCs
+      mat <- melfcc(wav, numcep = input$numMFCC, minfreq = 50, maxfreq = 5000, nbands  = 32)
+      mat <- na.omit(mat)
+
+      # Add deltas and deltadeltas
+      delta      <- tuneR::deltas(mat  )
+      deltadelta <- tuneR::deltas(delta)
+      mat <- cbind(mat, delta, deltadelta)
+
+      # Standardize coefficients across time
+      mat <- scale(mat)
+      
+      # Save matrix
+      write.table(mat, file = paste0(tempDir, s), quote = F, row.names = F, col.names = T, sep=",")
     }
     else
       showNotification(HTML(paste0("The duration of sound file ", s, " is too short, it will be skipped!")), type = "message", duration = NULL)
   }
-  
+
   filePrep <- function(varieties, items, genNum)
   {
     for (i in 1:length(varieties))
@@ -3226,18 +3338,6 @@ server <- function(input, output, session)
 
   dtw1 <- function(x,y)
   {
-    # Calculate distances between vectors of x and vectors of y
-    distance_matrix <- proxy::dist(x=x, y=y, method = function(x, y){1 - cor(x, y)})
-    
-    # Perform dynamic time warping
-    dtw_result <- dtw::dtw(x=distance_matrix, keep.internals=TRUE, step.pattern = symmetric1)
-    
-    # Get normalized distance
-    return(dtw_result$distance/length(dtw_result$index1))
-  }
-  
-  dtw2 <- function(x,y)
-  {
     nx <- nrow(x) + 1
     ny <- nrow(y) + 1
     
@@ -3283,15 +3383,31 @@ server <- function(input, output, session)
     
     return(m[nx,ny] / l)
   }
-  
+
+  dtw2 <- function(x,y)
+  {
+    # Calculate distances between vectors of x and vectors of y
+    if (input$selDTW=="DTW using Cosine θ"   )
+      distance_matrix <- proxy::dist(x=x, y=y, method = function(x, y){1 - cos.sim(x, y)})
+
+    if (input$selDTW=="DTW using Pearson's r")
+      distance_matrix <- proxy::dist(x=x, y=y, method = function(x, y){1 - cor    (x, y)})
+    
+    # Perform dynamic time warping
+    dtw_result <- dtw::dtw(x=distance_matrix, keep.internals=TRUE, step.pattern = symmetric1)
+    
+    # Get normalized distance
+    return(dtw_result$distance/length(dtw_result$index1))
+  }
+
   writeLine <- function(indFile, s)
   {
     indConn <- file(indFile, "a")
     writeLines(s, indConn) 
     close(indConn)
   }
-  
-  calcDist1 <- function(varieties, items, gends)
+
+  calcDist1 <- function(varieties, items)
   {
     indFile <- paste0(tempDir, "individual.tsv")
     writeLines("var1\tvar2\titem\tdist", con = indFile)
@@ -3329,7 +3445,7 @@ server <- function(input, output, session)
             m1 <- as.matrix(read.csv(s1 , quote=""))
             m2 <- as.matrix(read.csv(s2 , quote=""))
             
-            d   <- dtw1(x=m1, y=m2)
+            d   <- dtw2(x=m1, y=m2)
             sum <- sum + d
             num <- num + 1
             
@@ -3427,6 +3543,10 @@ server <- function(input, output, session)
         return(NULL)
       }
     }
+
+    # check sample rate
+    
+    checkSampleRate(varieties, items)
 
     # convert sound files to MFCC representations
     
@@ -4333,18 +4453,16 @@ server <- function(input, output, session)
       method <- "mcquitty"
     else
       
-    if (global$replyMethod31=="Ward's")
+    if (global$replyMethod31=="Ward's 1")
+      method <- "ward.D"
+    else
+
+    if (global$replyMethod31=="Ward's 2")
       method <- "ward.D2"
     else {}
 
-    if (global$replyMethod31!="HDBSCAN")
-      clus <- hclust (aggrMatDist(), method=method)
-    else
-    {
-      clus <- hdbscan(aggrMatDist(), minPts=2)$hc
-      clus$labels <- rownames(aggrMat())
-    }
-
+    clus <- hclust (aggrMatDist(), method=method)
+    
     explVar <- formatC(x=round2((cor(aggrMatDist(), cophenetic(clus))^2)*100, n=1), digits = 1, format = "f")
     contentOfMessage <- paste0("Variance explained by ", global$replyMethod31, " clustering: ", explVar, "%.")
     showNotification(contentOfMessage, type = "message", duration = NULL)
@@ -4539,7 +4657,7 @@ server <- function(input, output, session)
         div(style='height: 12px'),
         div(style='margin-left: 60px', radioButtons('replyMethod31',
                                        NULL,
-                                       c("Single-Linkage","Complete-Linkage","UPGMA","WPGMA","Ward's", "HDBSCAN"),
+                                       c("Single-Linkage", "Complete-Linkage", "UPGMA", "WPGMA", "Ward's 1", "Ward's 2"),
                                        selected=isolate(global$replyMethod31),
                                        inline = FALSE))
       )
@@ -4749,7 +4867,7 @@ server <- function(input, output, session)
     else {}
   })
   
-  observeEvent(input$mdsGeon32,
+  observeEvent(input$mdsGeon32, ignoreNULL = FALSE, ignoreInit = TRUE,
   {
     global$mdsGeon32 <- input$mdsGeon32
   })
@@ -5444,6 +5562,48 @@ server <- function(input, output, session)
     global$networkWeight <- input$networkWeight
   })
 
+  output$beamColors <- renderUI(
+  {
+    req(input$selClass5)
+      
+    if (input$selClass5 == "Beam map")
+      tagList(
+        div(style='margin-left: 60px; margin-top: -30px', 
+            checkboxInput(
+              inputId = "beamColors5",
+              label   = "rainbow colors",
+              value   = isolate(global$beamColors5))),
+        
+        br()
+      )
+  })      
+
+  output$networkColors <- renderUI(
+  {
+    req(input$selClass5)
+      
+    if (input$selClass5 == "Network map")
+      tagList(
+        div(style='margin-left: 60px; margin-top: -30px', 
+            checkboxInput(
+              inputId = "networkColors5",
+              label   = "rainbow colors",
+              value   = isolate(global$networkColors5))),
+          
+        br()
+      )
+  })      
+  
+  observeEvent(input$beamColors5,
+  {
+    global$beamColors5 <- input$beamColors5
+  })
+  
+  observeEvent(input$networkColors5,
+  {
+    global$networkColors5 <- input$networkColors5
+  })
+  
   output$selRGB <- renderUI(
   {
     req(input$selClass5)
@@ -5517,7 +5677,7 @@ server <- function(input, output, session)
     global$selB   <- input$selB
   })
 
-  observeEvent(input$selInv,
+  observeEvent(input$selInv, ignoreNULL = FALSE, ignoreInit = TRUE,
   {
     global$selInv <- input$selInv
   })
@@ -5827,17 +5987,28 @@ server <- function(input, output, session)
   {
     req(beamGeo5())
       
-    df <- beamGeo5()
+    df         <- beamGeo5()
       
-    df       <- df[order(-df$dist),]
-    df$dist  <- df$dist - min(df$dist)
+    df         <- df[order(-df$dist),]
+    df$dist    <- df$dist - min(df$dist)
       
-    df$dist  <- df$dist / max(df$dist)
-    df$dist  <- round2(df$dist * 255)
-      
-    colorX   <- format(as.hexmode(df$dist), width = 2)
-    df$color <- paste0("#", colorX, colorX, colorX)
-    
+    df$dist    <- df$dist / max(df$dist)
+    df$dist    <- round2(df$dist * 255)
+
+    if (!global$beamColors5)
+    {
+      colorX     <- format(as.hexmode(df$dist), width = 2)
+      df$color   <- paste0("#", colorX, colorX, colorX)
+    }
+    else
+    {
+      ramp       <- colorRamp(c("darkred", "red", "orange", "yellow", "green", "cyan", "lightcyan", "white"))
+      rgb_vals   <- ramp((0:255) / 255)
+      hex_colors <- rgb(rgb_vals[,1], rgb_vals[,2], rgb_vals[,3], maxColorValue = 255)
+      df$color   <- hex_colors[df$dist + 1]
+      df$opac    <- 1 - (df$dist / 255)
+    }
+
     return(df)
   })
   
@@ -5845,16 +6016,27 @@ server <- function(input, output, session)
   {
     req(networkGeo5())
 
-    df <- networkGeo5()
+    df         <- networkGeo5()
 
-    df       <- df[order(-df$dist),]
-    df$dist  <- df$dist - min(df$dist)
+    df         <- df[order(-df$dist),]
+    df$dist    <- df$dist - min(df$dist)
 
-    df$dist  <- df$dist / max(df$dist)
-    df$dist  <- round2(df$dist * 255)
+    df$dist    <- df$dist / max(df$dist)
+    df$dist    <- round2(df$dist * 255)
 
-    colorX   <- format(as.hexmode(df$dist), width = 2)
-    df$color <- paste0("#", colorX, colorX, colorX)
+    if (!global$networkColors5)
+    {
+      colorX     <- format(as.hexmode(df$dist), width = 2)
+      df$color   <- paste0("#", colorX, colorX, colorX)
+    }
+    else
+    {
+      ramp       <- colorRamp(c("darkred", "red", "orange", "yellow", "green", "cyan", "lightcyan", "white"))
+      rgb_vals   <- ramp((0:255) / 255)
+      hex_colors <- rgb(rgb_vals[,1], rgb_vals[,2], rgb_vals[,3], maxColorValue = 255)
+      df$color   <- hex_colors[df$dist + 1]
+      df$opac    <- 1 - (df$dist / 255)
+    }
 
     return(df)
   })
@@ -5983,19 +6165,24 @@ server <- function(input, output, session)
       addProviderTiles(provider = selProvider5()) %>%
       addPolylines(data = lines_sf, color = ~color, opacity = ~opac, weight = global$beamWeight, noClip = TRUE)
 
+    if (!global$beamColors5)
+      dotColor <- "blue"
+    else
+      dotColor <- "black"
+    
     if (input$dotRadiusBeam > 0)
       m <- m %>% addCircleMarkers(lng          = geoTab()$long,
                                   lat          = geoTab()$lat,
                                   label        = geoTab()[,1],
                                   labelOptions = labOpts,
                                   radius       = input$dotRadiusBeam,
-                                  color        = "blue",
+                                  color        = dotColor,
                                   fillOpacity  = 1,
                                   stroke       = FALSE)
     
     return(m)
   }
-  
+
   plotNetwork5 <- function()
   {
     req(input$dotRadiusNetwork)
@@ -6018,9 +6205,14 @@ server <- function(input, output, session)
     )
     
     m <- leaflet() %>%
-         fitBounds(min(geoTab()$long), min(geoTab()$lat), max(geoTab()$long), max(geoTab()$lat)) %>%
-         addProviderTiles(provider = selProvider5()) %>%
-         addPolylines(data = lines_sf, color = ~color, opacity = ~opac, weight = global$beamWeight, noClip = TRUE)
+      fitBounds(min(geoTab()$long), min(geoTab()$lat), max(geoTab()$long), max(geoTab()$lat)) %>%
+      addProviderTiles(provider = selProvider5()) %>%
+      addPolylines(data = lines_sf, color = ~color, opacity = ~opac, weight = global$networkWeight, noClip = TRUE)
+
+    if (!global$networkColors5)
+      dotColor <- "blue"
+    else
+      dotColor <- "black"
 
     if (input$dotRadiusNetwork > 0)
       m <- m %>% addCircleMarkers(lng          = geoTab()$long,
@@ -6028,7 +6220,7 @@ server <- function(input, output, session)
                                   label        = geoTab()[,1],
                                   labelOptions = labOpts,
                                   radius       = input$dotRadiusNetwork,
-                                  color        = "blue",
+                                  color        = dotColor,
                                   fillOpacity  = 1,
                                   stroke       = FALSE)
 
@@ -6188,7 +6380,7 @@ server <- function(input, output, session)
 
   output$selFormat5 <- renderUI(
   {
-    options <- c("JPG","PNG","PDF")
+    options <- c("JPG","PNG")
     
     if (input$selClass5=="Area map")
       options <- c(options, "TSV")
@@ -6232,23 +6424,29 @@ server <- function(input, output, session)
 
   output$downLoad5 <- downloadHandler(filename = fileName5, content = function(file)
   {
-    grDevices::pdf(NULL)
-
     if (!is.null(aggrMat()))
     {
       if (input$replyFormat5!="TSV")
       {
         map5 <- plotGraph5()
         map5$x$options <- append(map5$x$options, list("zoomControl" = FALSE))
-        saveWidget(map5, paste0(tempDir, "map.html"), selfcontained = FALSE)
-        webshot2::webshot(paste0(tempDir, "map.html"), file = file, zoom = dpi5(), selector = "#htmlwidget_container", vwidth = 0.6244378*input$winWidth, vheight = input$selSize5)
+
+        tmp5 <- paste0(tempDir, "map.html")
+        saveWidget(map5, tmp5, selfcontained = FALSE)
+
+        webshot2::webshot(
+          url      = tmp5,
+          file     = file,
+          zoom     = dpi5(),
+          selector = "#htmlwidget_container",
+          vwidth   = 0.6244378 * input$winWidth,
+          vheight  =             input$selSize5
+        )
       }
       else
         file.copy(paste0(tempDir, "area_map.tsv"), file, overwrite = T)
     }
     else {}
-
-    grDevices::graphics.off()
   })
 
   ##############################################################################
@@ -6257,31 +6455,20 @@ server <- function(input, output, session)
   {
     s <- isolate(global$replyMethod6)
                  
-    if (global$replyMethod31!="HDBSCAN")
+    if ((global$dataType == "transcriptions") | (global$dataType=="acousticdata" ))
     {
-      choice1 <- "Dynamic hybrid cut"
-      if (s=="HDBSCAN") s <- "Dynamic hybrid cut"
-     }
-     else
-     {
-       choice1 <- "HDBSCAN"
-       if (s=="Dynamic hybrid cut") s <- "HDBSCAN"
-     }
+      choice <- "Bootstrap clustering"
+      if (s=="Noise clustering") s <- "Bootstrap clustering"
+    }
                  
-     if ((global$dataType == "transcriptions") | (global$dataType=="acousticdata" ))
-     {
-       choice2 <- "Bootstrap clustering"
-       if (s=="Noise clustering") s <- "Bootstrap clustering"
-     }
+    if ((global$dataType == "postaggeddata")  | (global$dataType=="distancetable"))
+    {
+      choice <- "Noise clustering"
+      if (s=="Bootstrap clustering") s <- "Noise clustering"
+    }
                  
-     if ((global$dataType == "postaggeddata")  | (global$dataType=="distancetable"))
-     {
-       choice2 <- "Noise clustering"
-       if (s=="Bootstrap clustering") s <- "Noise clustering"
-     }
-                 
-     choices <- c("Largest gap method", "Constant height cut", choice1, choice2)
-     updateRadioButtons(session, "replyMethod6", choices = choices, selected = s)
+    choices <- c("Largest gap method", "Constant height cut", "Dynamic hybrid cut", choice, "HDBSCAN")
+    updateRadioButtons(session, "replyMethod6", choices = choices, selected = s)
   })
   
   observeEvent(input$replyMethod6,
@@ -6302,351 +6489,172 @@ server <- function(input, output, session)
   }
   
   # This function was generated using ChatGPT, OpenAI
-  explained_variance_partition <- function(d, labels, noise_label = 0) 
+  explained_variance_permanova <- function(d, labels, noise_label = 0) 
   {
     d <- as.matrix(d)
     
-    # Exclude noise points (label 0)
-    valid_idx <- labels != noise_label
-    labels <- labels[valid_idx]
+    # Remove noise points
+    keep <- labels != noise_label
     
-    if (length(unique(labels)) < 2)
+    d <- d[keep, keep]
+    labels <- labels[keep]
+    
+    n <- length(labels)
+    k <- length(unique(labels))
+    
+    if (n < 3 || k < 2) 
       return(0)
     
-    d <- d[valid_idx, valid_idx]
-    n <- nrow(d)
+    # Step 1: squared distance matrix
+    D2 <- d^2
+    
+    # Step 2: centering matrix
+    H <- diag(n) - matrix(1/n, n, n)
+    
+    # Step 3: Gower-centered matrix
+    G <- -0.5 * H %*% D2 %*% H
     
     # Total sum of squares
-    ss_total <- sum(d^2) / n
+    SS_total <- sum(diag(G))
     
-    # Within-group sum of squares
-    ss_within <- 0
-    for (l in unique(labels)) 
-    {
-      idx <- which(labels == l)
-      if (length(idx) > 1) 
-      {
-        sub_d <- d[idx, idx]
-        ss_within <- ss_within + sum(sub_d^2) / length(idx)
-      }
-    }
-
-    # R-squared
-    r2 <- 1 - (ss_within / ss_total)
-
-    # R-squared adjusted    
-    return(1 - ((1 - r2) * (n - 1)) / (n - length(unique(labels))))
-  }
-
-  silhouette_min_dist <- function(dist_matrix, labels, noise_label = 0) 
-  {
-    # Convert to matrix if needed
-    if (!is.matrix(dist_matrix)) 
-      dist_matrix <- as.matrix(dist_matrix)
-
-    # Exclude noise points (label 0)
-    valid_idx <- labels != noise_label
-    labels <- labels[valid_idx]
+    # Step 4: design matrix for clusters
+    Z <- model.matrix(~ factor(labels) - 1)
     
-    if (length(unique(labels)) < 2)
-      return(NA)
+    # Projection matrix onto cluster space
+    Hz <- Z %*% solve(t(Z) %*% Z) %*% t(Z)
     
-    n_valid <- length(labels)
-    dist_matrix <- dist_matrix[valid_idx, valid_idx]
+    # Between-group sum of squares
+    SS_between <- sum(diag(Hz %*% G))
     
-    sil_scores <- numeric(n_valid)
+    # Pseudo R^2
+    R2 <- SS_between / SS_total
     
-    for (i in 1:n_valid) 
-    {
-      own_cluster <- labels[i]
-      
-      # Intra-cluster distances (excluding self)
-      same_cluster <- which(labels == own_cluster & seq_len(n_valid) != i)
-      if (length(same_cluster) > 0) 
-      {
-        a_i <- min(dist_matrix[i, same_cluster])
-      } 
-      else 
-      {
-        a_i <- 0  # singleton cluster
-      }
-
-      # Inter-cluster minimum distance
-      other_clusters <- unique(labels[labels != own_cluster])
-      b_i <- Inf
- 
-      for (cl in other_clusters) 
-      {
-        cl_points <- which(labels == cl)
-        b_i <- min(b_i, min(dist_matrix[i, cl_points]))
-      }
-
-      # Silhouette formula
-      sil_scores[i] <- ifelse(max(a_i, b_i) == 0, 0, (b_i - a_i) / max(a_i, b_i))
-    }
-
-    return(round2(mean(sil_scores), 4))
-  }
-
-  silhouette_avg_dist <- function(dist_matrix, labels, noise_label = 0) 
-  {
-    # Convert to matrix if needed
-    if (!is.matrix(dist_matrix)) 
-      dist_matrix <- as.matrix(dist_matrix)
+    # Calculate adjusted R^2
+    k <- length(unique(labels))
+    R2_adj <- 1 - (1 - R2) * (n - 1) / (n - k)
     
-    # Exclude noise points (label 0)
-    valid_idx <- labels != noise_label
-    labels <- labels[valid_idx]
-    
-    if (length(unique(labels)) < 2)
-      return(NA)
-    
-    n_valid <- length(labels)
-    dist_matrix <- dist_matrix[valid_idx, valid_idx]
-    
-    sil_scores <- numeric(n_valid)
-    
-    for (i in 1:n_valid) 
-    {
-      own_cluster <- labels[i]
-      
-      # Intra-cluster distances (excluding self)
-      same_cluster <- which(labels == own_cluster & seq_len(n_valid) != i)
-      if (length(same_cluster) > 0) 
-      {
-        a_i <- mean(dist_matrix[i, same_cluster])
-      } 
-      else 
-      {
-        a_i <- 0  # singleton cluster
-      }
-      
-      # Inter-cluster mean distances
-      other_clusters <- unique(labels[labels != own_cluster])
-      b_i <- Inf
-      
-      for (cl in other_clusters) 
-      {
-        cl_points <- which(labels == cl)
-        b_i <- min(b_i, mean(dist_matrix[i, cl_points]))
-      }
-      
-      # Silhouette formula
-      sil_scores[i] <- ifelse(max(a_i, b_i) == 0, 0, (b_i - a_i) / max(a_i, b_i))
-    }
-    
-    return(round2(mean(sil_scores), 4))
-  }
-
-  silhouette_max_dist <- function(dist_matrix, labels, noise_label = 0) 
-  {
-    # Convert to matrix if needed
-    if (!is.matrix(dist_matrix)) 
-      dist_matrix <- as.matrix(dist_matrix)
-    
-    # Exclude noise points (label 0)
-    valid_idx <- labels != noise_label
-    labels <- labels[valid_idx]
-    
-    if (length(unique(labels)) < 2)
-      return(NA)
-    
-    n_valid <- length(labels)
-    dist_matrix <- dist_matrix[valid_idx, valid_idx]
-    
-    sil_scores <- numeric(n_valid)
-    
-    for (i in 1:n_valid) 
-    {
-      own_cluster <- labels[i]
-      
-      # Intra-cluster distances (excluding self)
-      same_cluster <- which(labels == own_cluster & seq_len(n_valid) != i)
-      if (length(same_cluster) > 0) 
-      {
-        a_i <- max(dist_matrix[i, same_cluster])
-      } 
-      else 
-      {
-        a_i <- 0  # singleton cluster
-      }
-      
-      # Inter-cluster mean distances
-      other_clusters <- unique(labels[labels != own_cluster])
-      b_i <- Inf
-      
-      for (cl in other_clusters) 
-      {
-        cl_points <- which(labels == cl)
-        b_i <- min(b_i, max(dist_matrix[i, cl_points]))
-      }
-      
-      # Silhouette formula
-      sil_scores[i] <- ifelse(max(a_i, b_i) == 0, 0, (b_i - a_i) / max(a_i, b_i))
-    }
-    
-    return(round2(mean(sil_scores), 4))
-  }
-
-  # This function was generated using ChatGPT, OpenAI
-  silhouette_wrd_dist <- function(dist_matrix, labels, noise_label = 0) 
-  {
-    # Convert to matrix if needed
-    if (!is.matrix(dist_matrix)) 
-      dist_matrix <- as.matrix(dist_matrix)
-    
-    # Exclude noise points (label 0)
-    valid_idx <- labels != noise_label
-    labels <- labels[valid_idx]
-    
-    if (length(unique(labels)) < 2)
-      return(NA)
-    
-    n_valid <- length(labels)
-    dist_matrix <- dist_matrix[valid_idx, valid_idx]
-    
-    sil_scores <- numeric(n_valid)
-    
-    # Helper: compute 'Within-cluster sum of squares' (WCSS)) from distance matrix for a set of indices
-    wcss <- function(idx) 
-    {
-      if (length(idx) <= 1) return(0)
-      sub_d <- dist_matrix[idx, idx, drop = FALSE]
-      sum(sub_d^2) / (2 * length(idx))
-    }
-    
-    for (i in 1:n_valid) 
-    {
-      own_cluster <- labels[i]
-      same_cluster <- which(labels == own_cluster)
-      
-      # a(i): variance increase if we remove i from own cluster
-      wcss_with <- wcss(same_cluster)
-      wcss_without <- wcss(setdiff(same_cluster, i))
-      a_i <- wcss_with - wcss_without
-      
-      # b(i): smallest variance increase if we add i to another cluster
-      b_i <- Inf
-      for (cl in setdiff(unique(labels), own_cluster)) 
-      {
-        cl_points <- which(labels == cl)
-        wcss_cl <- wcss(cl_points)
-        wcss_cl_with_i <- wcss(c(cl_points, i))
-        increase <- wcss_cl_with_i - wcss_cl
-        if (increase < b_i) b_i <- increase
-      }
-        
-      # Silhouette formula
-      sil_scores[i] <- ifelse(max(a_i, b_i) == 0, 0, (b_i - a_i) / max(a_i, b_i))
-    }
-    
-    return(round2(mean(sil_scores), 4))
+    return(R2_adj)
   }
   
-  dbcv_score <- function(dist_matrix, labels, noise_label = 0) 
+  # This function was generated using ChatGPT, OpenAI
+  explained_variance_adonis2 <- function(d, labels, noise_label = 0) 
   {
-    # Convert to matrix if needed
-    if (!is.matrix(dist_matrix)) 
-      dist_matrix <- as.matrix(dist_matrix)
+    d <- as.matrix(d)
     
-    n <- nrow(dist_matrix)
+    # Remove noise points
+    keep <- labels != noise_label
     
-    # Exclude noise points (label 0)
-    valid_idx <- labels != noise_label
-    labels <- labels[valid_idx]
+    d <- d[keep, keep]
+    labels <- labels[keep]
     
-    if (length(unique(labels)) < 2)
-      return(NA)
+    n <- length(labels)
+    k <- length(unique(labels))
     
-    n_valid <- length(labels)
-    dist_matrix <- dist_matrix[valid_idx, valid_idx]
+    if (n < 3 || k < 2) 
+      return(0)
     
-    result <- dbcv(x=as.dist(dist_matrix), cl=labels, d=nrow(dist_matrix), metric=NULL, sample=NULL)
-
-    return(round2(result$score, 4))
+    # Convert to dist object
+    d_dist <- as.dist(d)
+    
+    # Data frame for model
+    df <- data.frame(cluster = factor(labels))
+    
+    # Run PERMANOVA
+    fit <- vegan::adonis2(d_dist ~ cluster, data = df, permutations = 0)
+    
+    # Extract R²
+    R2 <- fit$R2[1]
+    
+    # Adjusted R²
+    R2_adj <- 1 - (1 - R2) * (n - 1) / (n - k)
+    
+    return(R2_adj)
   }
-
-  silhouette_all_dist <- function(dist_matrix, labels, noise_label = 0)
-  {
-    if (global$replyMethod31==  "Single-Linkage")
-      return(silhouette_min_dist(aggrMat(), labels, 0))
-    
-    if (global$replyMethod31=="Complete-Linkage")
-      return(silhouette_max_dist(aggrMat(), labels, 0))
-    
-    if (global$replyMethod31=="UPGMA")
-      return(silhouette_avg_dist(aggrMat(), labels, 0))
-    
-    if (global$replyMethod31=="WPGMA")
-      return(silhouette_avg_dist(aggrMat(), labels, 0))
-    
-    if (global$replyMethod31=="Ward's")
-      return(silhouette_wrd_dist(aggrMat(), labels, 0))
-    
-    if (global$replyMethod31=="HDBSCAN")
-      return(dbcv_score         (aggrMat(), labels, 0))
-  }
-
+  
   observeEvent(c(global$replyMethod31, input$replyMethod6, aggrMat()),
   {
     global$clusPar6 <- NULL          
   })
 
-  collapse_runs <- function(df) 
+  lastNonZeroIndex <- function(x) 
   {
-    # run-length encoding of y
-    r <- rle(df$score)
+    last <- length(x)
     
-    # map each row to its run
-    idx <- inverse.rle(list(lengths = r$lengths, values  = seq_along(r$values)))
+    while ((last >= 1) && (x[last] == 0))
+    {
+      last <- last - 1
+    }
     
-    # aggregate x by run (using mean), keep y value
-    result <- aggregate(df$number, by = list(run = idx, y = df$score), FUN = mean)
+    return(last)    
+  }
+
+  # This function was generated using ChatGPT, OpenAI
+  find_elbow <- function(x, y) 
+  {
+    # Smooth y values
+    y0 <- y
+    y  <- predict(smooth.spline(x, y, spar = 0.5), x)$y
+
+    # Line through first and last point: ax + by + c = 0
+    x1 <- x[1]
+    y1 <- y[1]
     
-    # reorder and rename columns
-    colnames(result) <- c("run", "score", "number")
-    result <- result[order(result$number),]
+    x2 <- x[length(x)]
+    y2 <- y[length(y)]
     
-    return(result)
+    a <- y2 - y1
+    b <- x1 - x2
+    c <- x2*y1 - x1*y2
+    
+    # Perpendicular distances
+    dist <- (a * x + b * y + c) / sqrt(a^2 + b^2)
+    
+    # Exclude endpoints
+    dist[c(1, length(dist))] <- NA
+    
+    # Find index where distance to chord is largest
+    idx <- which.min(dist)
+
+    # Plot
+  # plot  (x=x                    , y=y0                    , col = "blue"     , ylim = c(0, max(y0, y)), xlab="number of clusters", ylab="explained variance")
+  # lines (x=x                    , y=y                     , col = "darkgreen", lty  =  2)
+  # points(x=x[idx]               , y=y0[idx]               , col = "red"      , pch  = 19)
+  # lines (x=c(x[1], x[length(x)]), y= c(y[1], y[length(y)]), col = "purple"   , lty  =  1)
+    
+  # cat("\n")
+  # cat(x[idx ], " ", y0[idx ], "\n")
+
+    return(list(index = idx, elbow_x = x[idx], elbow_y = y0[idx]))
+  }
+
+  find_winner <- function(x,y)
+  {
+    idx <- which.max(y)
+    
+  # plot  (x=x     , y=y     , col = "blue", ylim=c(0, max(y)), xlab="minimum cluster size", ylab="explained variance")
+  # points(x=x[idx], y=y[idx], col = "red" , pch = 19)
+
+  # cat("\n")
+  # cat(x[idx], " ", y[idx], "\n")
+    
+    return(x[idx])
   }
 
   nGroups6 <- function(number, score)
   {
-    if (input$replyMethod6=="Constant height cut")
-    {
-      last_nonzero <- max(which(score != 0))
-      number <- number[1:last_nonzero]
-      score  <- score [1:last_nonzero]
-      
-      if (length(unique(number)) < 4)
-        return(number[which.max(score)])
-      
-      smooth <- predict(smooth.spline(number, score, spar = 0.5), number)$y
-      model.lm <- lm(smooth~log10(number))
-      
-      return(number[which.max(resid(model.lm))])
-    }
+    last <- lastNonZeroIndex(score)
+    number <- number[1:last]
+    score  <- score [1:last]
+    
+    if (length(unique(number)) < 4)
+      return(number[which.max(score)])
 
-    if ((input$replyMethod6=="Dynamic hybrid cut") | (input$replyMethod6=="HDBSCAN"))
-    {
-      df <- data.frame(number=number, score =score)
-      df <- collapse_runs(df)
-      df$run <- max(df$run) - df$run + 1
+    if  (input$replyMethod6=="Constant height cut")
+      return(find_elbow (number, score)$elbow_x)
 
-      if (length(unique(df$run)) < 4)
-        return(number[which.max(score)])
-            
-      df$smooth <- predict(smooth.spline(df$run, df$score, spar = 0.5), df$run)$y
-      
-      df$change <- 0
-      for (i in 2:(nrow(df)-1))
-      {
-        df$change[i] <- (df$smooth[i] - df$smooth[i-1]) - (df$smooth[i+1] - df$smooth[i])
-      }
-      
-      return(round(df$number[which.max(df$change)]))
-    }
-  }    
+    if ((input$replyMethod6== "Dynamic hybrid cut") | (input$replyMethod6=="HDBSCAN"))
+      return(find_winner(number, score))
+  }
 
   setClusPar <- function()
   {
@@ -6657,11 +6665,14 @@ server <- function(input, output, session)
       if (length(global$clusPar6)==0)
       {
         n <- ncol(aggrMat())
-        number <- 2:(n-1)       
+        number <- 1:(n-1)       
         score  <- rep(0, length(number))
 
         for (i in number) 
         { 
+          if (i<2)
+            next
+
           if (input$replyMethod6=="Constant height cut")
             partition <- cutree(tree = clusObj3(), k = i)
 
@@ -6684,7 +6695,7 @@ server <- function(input, output, session)
           if (length(unique(partition)) == 0)
             next
 
-          score[i-1] <- explained_variance_partition(aggrMat(), partition, 0)
+          score[i] <- explained_variance_permanova(aggrMat(), partition, 0)
         }
 
         global$clusPar6 <- nGroups6(number, score)
@@ -6761,8 +6772,10 @@ server <- function(input, output, session)
 
       write_csv(df, paste0(tempDir, "partition.csv"), col_names = F)
       
+      stop_if_running(global$background6)
       global$background6 <- r_bg(
-        func = function(){return(NULL)}
+        func      = function(){return(NULL)},
+        supervise = TRUE
       )
     }
 
@@ -6773,9 +6786,11 @@ server <- function(input, output, session)
       if (file.exists(paste0(   tempDir, "partition.csv")))
         system(paste0("rm -f ", tempDir, "partition.csv"))
 
+      if (global$clusPar6 < 2) global$clusPar6 <- 2
+
       if (input$replyMethod6=="Constant height cut")
         partition <- cutree(clusObj3(), global$clusPar6)
-      
+
       if (input$replyMethod6=="Dynamic hybrid cut")
         partition <- cutreeDynamic(dendro         = clusObj3(),
                                    distM          = as.matrix(aggrMat()),
@@ -6786,19 +6801,21 @@ server <- function(input, output, session)
       
       if (input$replyMethod6=="HDBSCAN")
         partition <- hdbscan(as.dist(aggrMat()), minPts = global$clusPar6)$cluster
-      
+
       df <-  data.frame(
         cluster = removeSingletonClusters(partition),
         variety = colnames(aggrMat())
       )
-      
+
       write_csv(df, paste0(tempDir, "partition.csv"), col_names = F)
       
+      stop_if_running(global$background6)
       global$background6 <- r_bg(
-        func = function(){return(NULL)}
+        func      = function(){return(NULL)},
+        supervise = TRUE
       )
     }
-    
+
     Partition3 <- function()
     {
       if (global$replyMethod31==  "Single-Linkage")
@@ -6817,8 +6834,12 @@ server <- function(input, output, session)
         methodc <- 4
       else
         
-      if (global$replyMethod31=="Ward's")
+      if (global$replyMethod31=="Ward's 1")
         methodc <- 7
+      else
+          
+      if (global$replyMethod31=="Ward's 2")
+        methodc <- 8
       else
       {
         showNotification(paste0(input$replyMethod6, " not available for ", global$replyMethod31, "!"), type = "message", duration = NULL)
@@ -6846,9 +6867,11 @@ server <- function(input, output, session)
         )
       }
 
+      stop_if_running(global$background6)
       global$background6 <- r_bg(
-        func = System2,
-        args = list(methodc, methodr, input$numIter6, tempDir)
+        func      = System2,
+        args      = list(methodc, methodr, input$numIter6, tempDir),
+        supervise = TRUE
       )
     }
 
@@ -6898,10 +6921,14 @@ server <- function(input, output, session)
 
       showNotification(paste(nClass, "varieties out of", nAll, "are classified into", nGroups, "groups."), type = "message", duration = NULL)
 
-      evp <- explained_variance_partition(as.dist(aggrMat()), global$partition$V1, 0)
+      evp <- explained_variance_permanova(as.dist(aggrMat()), global$partition$V1, 0)
       explVar <- formatC(x=round2(evp * 100, n=1), digits = 1, format = "f")
 
-      contentOfMessage <- paste0("Variance explained by ", global$replyMethod31, " with ", input$replyMethod6, ": ", explVar, "%.")
+      if (input$replyMethod6!="HDBSCAN")
+        contentOfMessage <- paste0("Adjusted variance explained by ", global$replyMethod31, " with ", input$replyMethod6, ": ", explVar, "%.")
+      else
+        contentOfMessage <- paste0("Adjusted variance explained by ", input$replyMethod6, ": ", explVar, "%.")
+      
       showNotification(contentOfMessage, type = "message", duration = NULL)                     
 
       insertUI(
@@ -7115,7 +7142,7 @@ server <- function(input, output, session)
 
   output$selFormat6 <- renderUI(
   {
-    options <- c("JPG","PNG","PDF","TSV")
+    options <- c("JPG","PNG","TSV")
     selectInput('replyFormat6', label=NULL, options, selected = "PNG", selectize=FALSE, multiple=FALSE)
   })
 
@@ -7144,23 +7171,29 @@ server <- function(input, output, session)
 
   output$downLoad6 <- downloadHandler(filename = fileName6, content = function(file)
   {
-    grDevices::pdf(NULL)
-
     if (!is.null(global$partition))
     {
       if (input$replyFormat6!="TSV")
       {
         map6 <- plotGraph6()
         map6$x$options <- append(map6$x$options, list("zoomControl" = FALSE))
-        saveWidget(map6, paste0(tempDir, "map.html"), selfcontained = FALSE)
-        webshot2::webshot(paste0(tempDir, "map.html"), file = file, zoom = dpi6(), selector = "#htmlwidget_container", vwidth = 0.6244378*input$winWidth, vheight = input$selSize6)
+
+        tmp6 <- paste0(tempDir, "map.html")
+        saveWidget(map6, tmp6, selfcontained = FALSE)
+        
+        webshot2::webshot(
+          url      = tmp6,
+          file     = file,
+          zoom     = dpi6(),
+          selector = "#htmlwidget_container",
+          vwidth   = 0.6244378 * input$winWidth,
+          vheight  =             input$selSize6
+        )
       }
       else
         file.copy(paste0(tempDir, "partition_map.tsv"), file, overwrite = T)
     }
     else {}
-
-    grDevices::graphics.off()
   })
 
   ##############################################################################
