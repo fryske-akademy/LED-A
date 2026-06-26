@@ -4302,7 +4302,7 @@ server <- function(input, output, session)
     fs <- as.numeric(input$replyPoint7)/2.8346438836889
     
     gp <- ggplot(data = world) +
-      geom_sf() +
+      geom_sf(fill = "#f8f8f8", color = "grey60", linewidth = 0.2) +
       geom_point(data=geoTab(), aes(x=long, y=lat, color=geoTab()$group), size = input$dotRadius7) +
       geom_text_repel(data=geoTab(), aes(x=long, y=lat, label=df$labs),
                       color=textCol, max.overlaps = nrow(geoTab()),
