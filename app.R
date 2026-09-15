@@ -68,8 +68,15 @@ Fonts <- c("DejaVu Sans", "DejaVu Serif", "FreeSans", "FreeSerif", "Latin Modern
 
 ################################################################################
 
-# https://leaflet-extras.github.io/leaflet-providers/preview/
-Providers <- c("CartoDB Positron", "CartoDB Positron No Labels", "CartoDB Voyager", "CartoDB Voyager No Labels", "Esri World Terrain", "Esri World Gray Canvas")
+Providers <- c(
+  "OFM Positron",
+  "OFM Positron No Labels",
+  "OFM Liberty",
+  "OFM Liberty No Labels",
+  "OFM Bright",
+  "OFM Bright No Labels",
+  "OFM Bright Plain"
+)
 
 ################################################################################
 
@@ -108,7 +115,20 @@ ui <- tagList(
                      Shiny.setInputValue('refresh_detected', true, {priority: 'event'});
                    });
                  })();
-               ")
+               "),
+    
+    tags$link(
+      rel = "stylesheet",
+      href = "maplibre-gl.css"
+    ),
+    
+    tags$script(
+      src = "maplibre-gl.js"
+    ),
+    
+    tags$script(
+      src = "openfreemap.js"
+    )
   ),
 
   navbarPage
@@ -461,7 +481,7 @@ ui <- tagList(
               inputId    = 'selDTW',
               label      = NULL,
               choices    = c("DTW using Cosine θ", "DTW using Pearson's r"),
-              selected   = "DTW using Cosine θ",
+              selected   = "DTW using Pearson's r",
               inline     = FALSE
             )
           ),
@@ -998,7 +1018,7 @@ ui <- tagList(
             align="center",
             cellWidths = c("180px", "100px", "100px", "100px", "auto"),
 
-            selectInput ('selMap5' , NULL, Providers, selected = "CartoDB Positron", selectize=FALSE, multiple = FALSE),
+            selectInput ('selMap5' , NULL, Providers, selected = "OFM Positron No Labels", selectize=FALSE, multiple = FALSE),
             numericInput('selSize5', NULL, value = 550, min = 550, step = 50),
             uiOutput('selFormat5'),
             uiOutput('selDPI5'),
@@ -1069,7 +1089,7 @@ ui <- tagList(
             align="center",
             cellWidths = c("180px", "100px", "100px", "100px", "auto"),
 
-            selectInput ('selMap6' , NULL, Providers, selected = "CartoDB Positron", selectize=FALSE, multiple = FALSE),
+            selectInput ('selMap6' , NULL, Providers, selected = "OFM Positron No Labels", selectize=FALSE, multiple = FALSE),
             numericInput('selSize6', NULL, value = 550, min = 550, step = 50),
             uiOutput('selFormat6'),
             uiOutput('selDPI6'),
@@ -3266,12 +3286,7 @@ server <- function(input, output, session)
       mat <- melfcc(wav, numcep = input$numMFCC, minfreq = 50, maxfreq = 5000, nbands  = 32)
       mat <- na.omit(mat)
 
-      # Add deltas and deltadeltas
-      delta      <- tuneR::deltas(mat  )
-      deltadelta <- tuneR::deltas(delta)
-      mat <- cbind(mat, delta, deltadelta)
-
-      # Standardize coefficients across time
+      # Normalize each coefficient separately across all time frames
       mat <- scale(mat)
       
       # Save matrix
@@ -3388,10 +3403,10 @@ server <- function(input, output, session)
   {
     # Calculate distances between vectors of x and vectors of y
     if (input$selDTW=="DTW using Cosine θ"   )
-      distance_matrix <- proxy::dist(x=x, y=y, method = function(x, y){1 - cos.sim(x, y)})
+      distance_matrix <- as.matrix(proxy::dist(x=x, y=y, method = function(x, y){1 - cos.sim(x, y)}))
 
     if (input$selDTW=="DTW using Pearson's r")
-      distance_matrix <- proxy::dist(x=x, y=y, method = function(x, y){1 - cor    (x, y)})
+      distance_matrix <- as.matrix(proxy::dist(x=x, y=y, method = function(x, y){1 - cor    (x, y)}))
     
     # Perform dynamic time warping
     dtw_result <- dtw::dtw(x=distance_matrix, keep.internals=TRUE, step.pattern = symmetric1)
@@ -6094,109 +6109,238 @@ server <- function(input, output, session)
     return(paste0("#", colorR, colorG, colorB))
   })
   
-  selProvider5 <- function()
+  addBaseMap <- function(m, provider)
   {
-    if (input$selMap5 == "CartoDB Positron")
-      return(providers$CartoDB.Positron)
+    ofmProviders <- c(
+      "OFM Positron",
+      "OFM Positron No Labels",
+      "OFM Liberty",
+      "OFM Liberty No Labels",
+      "OFM Bright",
+      "OFM Bright No Labels",
+      "OFM Bright Plain"
+    )
+    
+    if (provider %in% ofmProviders)
+    {
+      noLabels <- grepl(
+        "No Labels$",
+        provider
+      )
+      
+      plain <- grepl(
+        "Bright Plain",
+        provider
+      )
+      
+      if (grepl("Positron", provider))
+        style <- "positron"
+      
+      if (grepl("Liberty", provider))
+        style <- "liberty"
+      
+      if (
+        grepl("Bright", provider) &&
+        !plain
+      )
+        style <- "bright"
+      
+      if (plain)
+        style <- "bright"
+      
+      m <- htmlwidgets::onRender(
+        m,
+        "
+      function(el, x, data) {
 
-    if (input$selMap5 == "CartoDB Positron No Labels")
-      return(providers$CartoDB.PositronNoLabels)
+        addOpenFreeMapToLeaflet(
+          this,
+          data.style,
+          data.noLabels,
+          data.plain
+        );
 
-    if (input$selMap5 == "CartoDB Voyager")
-      return(providers$CartoDB.Voyager)
-
-    if (input$selMap5 == "CartoDB Voyager No Labels")
-      return(providers$CartoDB.VoyagerNoLabels)
-
-    if (input$selMap5 == "Esri World Terrain")
-      return(providers$Esri.WorldTerrain)
-
-    if (input$selMap5 == "Esri World Gray Canvas")
-      return(providers$Esri.WorldGrayCanvas)
-  }
-
-  showPoints  <- function(df, Colors, selBorder, radius, selProvider)
-  {
-  # labOpts <- labelOptions(noHide = T, textOnly = T, direction = "left", offset = c(-9, 0))
-    labOpts <- NULL
-
-    m <- leaflet() %>%
-      fitBounds(min(geoTab()$long), min(geoTab()$lat), max(geoTab()$long), max(geoTab()$lat)) %>%
-      addProviderTiles(provider     = do.call(selProvider, args = list())) %>%
-
-      addCircleMarkers(lng          = df$long,
-                       lat          = df$lat,
-                       label        = df[,1],
-                       labelOptions = labOpts,
-                       radius       = radius,
-                       fillColor    = Colors,
-                       fillOpacity  = 1,
-                       stroke       = selBorder,
-                       color        = "#000000",
-                       weight       = 1,
-                       opacity      = 1)
-
+      }
+      ",
+        data = list(
+          style    = style,
+          noLabels = noLabels,
+          plain    = plain
+        )
+      )
+    }
+    else
+    {
+      m <- m %>%
+        addProviderTiles(
+          provider = provider
+        )
+    }
+    
     return(m)
   }
+  
+  selProvider5 <- function()
+  {
+    if (grepl("^OFM ", input$selMap5))
+      return(input$selMap5)
+  }
 
+  showPoints <- function(df, Colors, selBorder, radius, selProvider)
+  {
+    # labOpts <- labelOptions(
+    #   noHide = TRUE,
+    #   textOnly = TRUE,
+    #   direction = "left",
+    #   offset = c(-9, 0)
+    # )
+    
+    labOpts <- NULL
+    
+    provider <- do.call(selProvider, args = list())
+    
+    m <- leaflet() %>%
+      fitBounds(
+        min(geoTab()$long),
+        min(geoTab()$lat),
+        max(geoTab()$long),
+        max(geoTab()$lat)
+      )
+    
+    m <- addBaseMap(m, provider)
+    
+    m <- m %>%
+      addCircleMarkers(
+        lng          = df$long,
+        lat          = df$lat,
+        label        = df[, 1],
+        labelOptions = labOpts,
+        radius       = radius,
+        fillColor    = Colors,
+        fillOpacity  = 1,
+        stroke       = selBorder,
+        color        = "#000000",
+        weight       = 1,
+        opacity      = 1
+      )
+    
+    return(m)
+  }
+  
   plotBeam5 <- function()
   {
     req(input$dotRadiusBeam)
     
-  # labOpts <- labelOptions(noHide = T, textOnly = T, direction = "left", offset = c(-9, 0))
+    # labOpts <- labelOptions(
+    #   noHide = TRUE,
+    #   textOnly = TRUE,
+    #   direction = "left",
+    #   offset = c(-9, 0)
+    # )
+    
     labOpts <- NULL
-
-    lines_list <- lapply(1:nrow(beamObj5()), function(i) 
-    {
-      st_linestring(matrix(c(
-        beamObj5()$long1[i], beamObj5()$lat1[i],
-        beamObj5()$long2[i], beamObj5()$lat2[i]
-      ), ncol = 2, byrow = TRUE))
-    })
+    
+    lines_list <- lapply(
+      1:nrow(beamObj5()),
+      function(i)
+      {
+        st_linestring(
+          matrix(
+            c(
+              beamObj5()$long1[i],
+              beamObj5()$lat1[i],
+              beamObj5()$long2[i],
+              beamObj5()$lat2[i]
+            ),
+            ncol = 2,
+            byrow = TRUE
+          )
+        )
+      }
+    )
     
     lines_sf <- st_sf(
       geometry = st_sfc(lines_list, crs = 4326),
       color    = beamObj5()$color,
       opac     = beamObj5()$opac
     )
-
+    
     m <- leaflet() %>%
-      fitBounds(min(geoTab()$long), min(geoTab()$lat), max(geoTab()$long), max(geoTab()$lat)) %>%
-      addProviderTiles(provider = selProvider5()) %>%
-      addPolylines(data = lines_sf, color = ~color, opacity = ~opac, weight = global$beamWeight, noClip = TRUE)
-
+      fitBounds(
+        min(geoTab()$long),
+        min(geoTab()$lat),
+        max(geoTab()$long),
+        max(geoTab()$lat)
+      )
+    
+    m <- addBaseMap(
+      m,
+      selProvider5()
+    )
+    
+    m <- m %>%
+      addPolylines(
+        data = lines_sf,
+        color = ~color,
+        opacity = ~opac,
+        weight = global$beamWeight,
+        noClip = TRUE
+      )
+    
     if (!global$beamColors5)
       dotColor <- "blue"
     else
       dotColor <- "black"
     
     if (input$dotRadiusBeam > 0)
-      m <- m %>% addCircleMarkers(lng          = geoTab()$long,
-                                  lat          = geoTab()$lat,
-                                  label        = geoTab()[,1],
-                                  labelOptions = labOpts,
-                                  radius       = input$dotRadiusBeam,
-                                  color        = dotColor,
-                                  fillOpacity  = 1,
-                                  stroke       = FALSE)
+    {
+      m <- m %>%
+        addCircleMarkers(
+          lng          = geoTab()$long,
+          lat          = geoTab()$lat,
+          label        = geoTab()[, 1],
+          labelOptions = labOpts,
+          radius       = input$dotRadiusBeam,
+          color        = dotColor,
+          fillOpacity  = 1,
+          stroke       = FALSE
+        )
+    }
     
     return(m)
   }
-
+  
   plotNetwork5 <- function()
   {
     req(input$dotRadiusNetwork)
-
-  # labOpts <- labelOptions(noHide = T, textOnly = T, direction = "left", offset = c(-9, 0))
+    
+    # labOpts <- labelOptions(
+    #   noHide = TRUE,
+    #   textOnly = TRUE,
+    #   direction = "left",
+    #   offset = c(-9, 0)
+    # )
+    
     labOpts <- NULL
-
-    lines_list <- lapply(1:nrow(networkObj5()), function(i) 
-    {
-      st_linestring(matrix(c(
-        networkObj5()$long1[i], networkObj5()$lat1[i],
-        networkObj5()$long2[i], networkObj5()$lat2[i]
-      ), ncol = 2, byrow = TRUE))
-    })
+    
+    lines_list <- lapply(
+      1:nrow(networkObj5()),
+      function(i)
+      {
+        st_linestring(
+          matrix(
+            c(
+              networkObj5()$long1[i],
+              networkObj5()$lat1[i],
+              networkObj5()$long2[i],
+              networkObj5()$lat2[i]
+            ),
+            ncol = 2,
+            byrow = TRUE
+          )
+        )
+      }
+    )
     
     lines_sf <- st_sf(
       geometry = st_sfc(lines_list, crs = 4326),
@@ -6205,25 +6349,47 @@ server <- function(input, output, session)
     )
     
     m <- leaflet() %>%
-      fitBounds(min(geoTab()$long), min(geoTab()$lat), max(geoTab()$long), max(geoTab()$lat)) %>%
-      addProviderTiles(provider = selProvider5()) %>%
-      addPolylines(data = lines_sf, color = ~color, opacity = ~opac, weight = global$networkWeight, noClip = TRUE)
-
+      fitBounds(
+        min(geoTab()$long),
+        min(geoTab()$lat),
+        max(geoTab()$long),
+        max(geoTab()$lat)
+      )
+    
+    m <- addBaseMap(
+      m,
+      selProvider5()
+    )
+    
+    m <- m %>%
+      addPolylines(
+        data = lines_sf,
+        color = ~color,
+        opacity = ~opac,
+        weight = global$networkWeight,
+        noClip = TRUE
+      )
+    
     if (!global$networkColors5)
       dotColor <- "blue"
     else
       dotColor <- "black"
-
+    
     if (input$dotRadiusNetwork > 0)
-      m <- m %>% addCircleMarkers(lng          = geoTab()$long,
-                                  lat          = geoTab()$lat,
-                                  label        = geoTab()[,1],
-                                  labelOptions = labOpts,
-                                  radius       = input$dotRadiusNetwork,
-                                  color        = dotColor,
-                                  fillOpacity  = 1,
-                                  stroke       = FALSE)
-
+    {
+      m <- m %>%
+        addCircleMarkers(
+          lng          = geoTab()$long,
+          lat          = geoTab()$lat,
+          label        = geoTab()[, 1],
+          labelOptions = labOpts,
+          radius       = input$dotRadiusNetwork,
+          color        = dotColor,
+          fillOpacity  = 1,
+          stroke       = FALSE
+        )
+    }
+    
     return(m)
   }
 
@@ -6422,32 +6588,90 @@ server <- function(input, output, session)
     return(paste0(type, "_map.", input$replyFormat5))
   }
 
-  output$downLoad5 <- downloadHandler(filename = fileName5, content = function(file)
-  {
-    if (!is.null(aggrMat()))
+  output$downLoad5 <- downloadHandler(
+    filename = fileName5,
+    
+    content = function(file)
     {
-      if (input$replyFormat5!="TSV")
+      if (!is.null(aggrMat()))
       {
-        map5 <- plotGraph5()
-        map5$x$options <- append(map5$x$options, list("zoomControl" = FALSE))
-
-        tmp5 <- paste0(tempDir, "map.html")
-        saveWidget(map5, tmp5, selfcontained = FALSE)
-
-        webshot2::webshot(
-          url      = tmp5,
-          file     = file,
-          zoom     = dpi5(),
-          selector = "#htmlwidget_container",
-          vwidth   = 0.6244378 * input$winWidth,
-          vheight  =             input$selSize5
-        )
+        if (input$replyFormat5 != "TSV")
+        {
+          map5 <- plotGraph5()
+          
+          map5$x$options <- append(
+            map5$x$options,
+            list("zoomControl" = FALSE)
+          )
+          
+          #
+          # Add the local OpenFreeMap/MapLibre files
+          # explicitly to the standalone widget.
+          #
+          
+          ofmDependency <- htmltools::htmlDependency(
+            name    = "openfreemap-leda",
+            version = "1.0.0",
+            src     = c(
+              file = normalizePath("www")
+            ),
+            stylesheet = "maplibre-gl.css",
+            script = c(
+              "maplibre-gl.js",
+              "leaflet-maplibre-gl.js",
+              "openfreemap.js"
+            ),
+            all_files = FALSE
+          )
+          
+          map5$dependencies <- c(
+            map5$dependencies,
+            list(ofmDependency)
+          )
+          
+          #
+          # Save temporary HTML
+          #
+          
+          tmp5 <- paste0(
+            tempDir,
+            "map.html"
+          )
+          
+          htmlwidgets::saveWidget(
+            map5,
+            tmp5,
+            selfcontained = FALSE
+          )
+          
+          #
+          # Take screenshot.
+          #
+          # MapLibre needs time to load and render
+          # the vector tiles.
+          #
+          
+          webshot2::webshot(
+            url      = tmp5,
+            file     = file,
+            zoom     = dpi5(),
+            selector = "#htmlwidget_container",
+            vwidth   = 0.6244378 * input$winWidth,
+            vheight  = input$selSize5,
+            delay    = 3
+          )
+        }
+        else
+        {
+          file.copy(
+            paste0(tempDir, "area_map.tsv"),
+            file,
+            overwrite = TRUE
+          )
+        }
       }
-      else
-        file.copy(paste0(tempDir, "area_map.tsv"), file, overwrite = T)
     }
-    else {}
-  })
+  )
 
   ##############################################################################
 
@@ -7066,23 +7290,8 @@ server <- function(input, output, session)
   
   selProvider6 <- function()
   {
-    if (input$selMap6 == "CartoDB Positron")
-      return(providers$CartoDB.Positron)
-
-    if (input$selMap6 == "CartoDB Positron No Labels")
-      return(providers$CartoDB.PositronNoLabels)
-
-    if (input$selMap6 == "CartoDB Voyager")
-      return(providers$CartoDB.Voyager)
-
-    if (input$selMap6 == "CartoDB Voyager No Labels")
-      return(providers$CartoDB.VoyagerNoLabels)
-
-    if (input$selMap6 == "Esri World Terrain")
-      return(providers$Esri.WorldTerrain)
-
-    if (input$selMap6 == "Esri World Gray Canvas")
-      return(providers$Esri.WorldGrayCanvas)
+    if (grepl("^OFM ", input$selMap6))
+      return(input$selMap6)
   }
 
   plotGraph6 <- function()
@@ -7169,32 +7378,90 @@ server <- function(input, output, session)
     return(paste0("partition_map.", input$replyFormat6))
   }
 
-  output$downLoad6 <- downloadHandler(filename = fileName6, content = function(file)
-  {
-    if (!is.null(global$partition))
+  output$downLoad6 <- downloadHandler(
+    filename = fileName6,
+    
+    content = function(file)
     {
-      if (input$replyFormat6!="TSV")
+      if (!is.null(aggrMat()))
       {
-        map6 <- plotGraph6()
-        map6$x$options <- append(map6$x$options, list("zoomControl" = FALSE))
-
-        tmp6 <- paste0(tempDir, "map.html")
-        saveWidget(map6, tmp6, selfcontained = FALSE)
-        
-        webshot2::webshot(
-          url      = tmp6,
-          file     = file,
-          zoom     = dpi6(),
-          selector = "#htmlwidget_container",
-          vwidth   = 0.6244378 * input$winWidth,
-          vheight  =             input$selSize6
-        )
+        if (input$replyFormat6 != "TSV")
+        {
+          map6 <- plotGraph6()
+          
+          map6$x$options <- append(
+            map6$x$options,
+            list("zoomControl" = FALSE)
+          )
+          
+          #
+          # Add the local OpenFreeMap/MapLibre files
+          # explicitly to the standalone widget.
+          #
+          
+          ofmDependency <- htmltools::htmlDependency(
+            name    = "openfreemap-leda",
+            version = "1.0.0",
+            src     = c(
+              file = normalizePath("www")
+            ),
+            stylesheet = "maplibre-gl.css",
+            script = c(
+              "maplibre-gl.js",
+              "leaflet-maplibre-gl.js",
+              "openfreemap.js"
+            ),
+            all_files = FALSE
+          )
+          
+          map6$dependencies <- c(
+            map6$dependencies,
+            list(ofmDependency)
+          )
+          
+          #
+          # Save temporary HTML
+          #
+          
+          tmp6 <- paste0(
+            tempDir,
+            "map.html"
+          )
+          
+          htmlwidgets::saveWidget(
+            map6,
+            tmp6,
+            selfcontained = FALSE
+          )
+          
+          #
+          # Take screenshot.
+          #
+          # MapLibre needs time to load and render
+          # the vector tiles.
+          #
+          
+          webshot2::webshot(
+            url      = tmp6,
+            file     = file,
+            zoom     = dpi6(),
+            selector = "#htmlwidget_container",
+            vwidth   = 0.6244378 * input$winWidth,
+            vheight  = input$selSize6,
+            delay    = 3
+          )
+        }
+        else
+        {
+          file.copy(
+            paste0(tempDir, "partition_map.tsv"),
+            file,
+            overwrite = TRUE
+          )
+        }
       }
-      else
-        file.copy(paste0(tempDir, "partition_map.tsv"), file, overwrite = T)
     }
-    else {}
-  })
+  )
 
   ##############################################################################
 
