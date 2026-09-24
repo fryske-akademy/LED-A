@@ -32,7 +32,7 @@ RUN R -e "install.packages(c('shiny', 'shinyBS', 'shinyWidgets', 'shinyjqui', \
 'colouR', 'crosstalk', 'htmltools', 'htmlwidgets', 'jquerylib', 'leaflet.providers', \
 'magrittr', 'methods', 'png', 'raster', 'RColorBrewer', 'rlang', 'scales', \
 'sf', 'viridisLite', 'xfun', 'leaflet', 'leaflet.extras', 'Rtsne', 'grid', 'dplyr', \
-'svglite', 'Cairo', 'tikzDevice', 'htmlwidgets', 'webshot2', 'callr', 'remotes', \
+'svglite', 'Cairo', 'tikzDevice', 'htmlwidgets', 'webshot2', 'processx', 'remotes', \
 'RJSONIO'))"
 
 # Install naturalearch packages
