@@ -39,7 +39,7 @@ library(Cairo)
 library(tikzDevice)
 library(htmlwidgets)
 library(webshot2)
-library(callr)
+library(processx)
 
 # sudo apt install libudunits2-dev libgdal-dev libfontconfig1-dev libcairo2-dev libxt-dev libharfbuzz-dev libfribidi-dev chromium-browser texlive-full
 
@@ -1189,7 +1189,6 @@ ui <- tagList(
           (
             tags$li(tags$span(HTML("<span style='color:blue'>base</span>"), p("R Core Team (2023). _R: A Language and Environment for Statistical Computing_. R Foundation for Statistical Computing, Vienna, Austria. URL: https://www.R-project.org/."))),
             tags$li(tags$span(HTML("<span style='color:blue'>Cairo</span>"), p("Urbanek S, Horner J (2022). _Cairo: R Graphics Device using Cairo Graphics Library for Creating High-Quality Bitmap (PNG, JPEG, TIFF), Vector (PDF, SVG, PostScript) and Display (X11 and Win32) Output_. URL: https://CRAN.R-project.org/package=Cairo."))),
-            tags$li(tags$span(HTML("<span style='color:blue'>callr</span>"), p("Csárdi G, Chang W (2022). _callr: Call R from R_. URL: https://CRAN.R-project.org/package=callr."))),
             tags$li(tags$span(HTML("<span style='color:blue'>colouR</span>"), p("Inglis A (2023). _colouR: Create Colour Palettes from Images_. URL: https://CRAN.R-project.org/package=colouR."))),
             tags$li(tags$span(HTML("<span style='color:blue'>dbscan</span>"), p("Hahsler M, Piekenbrock M (2024). _dbscan: Density-Based Spatial Clustering of Applications with Noise (DBSCAN) and Related Algorithms_. URL: https://CRAN.R-project.org/package=dbscan.", br(),
                                                                                 "Hahsler M, Piekenbrock M, Doran D (2019). “dbscan: Fast Density-Based Clustering with R.” _Journal of Statistical Software_, *91*(1), 1-30."))),
@@ -1212,6 +1211,7 @@ ui <- tagList(
             tags$li(tags$span(HTML("<span style='color:blue'>openxlsx</span>"), p("Schauberger P, Walker A (2023). _openxlsx: Read, Write and Edit xlsx Files_. URL: https://CRAN.R-project.org/package=openxlsx."))),
             tags$li(tags$span(HTML("<span style='color:blue'>pcaPP</span>"), p("Filzmoser P, Fritz H, Kalcher K (2024). _pcaPP: Robust PCA by Projection Pursuit_. URL: https://doi.org/10.32614/CRAN.package.pcaPP."))),
             tags$li(tags$span(HTML("<span style='color:blue'>plyr</span>"), p("Hadley Wickham (2011). The Split-Apply-Combine Strategy for Data Analysis. Journal of Statistical Software, 40(1), 1-29. URL: https://www.jstatsoft.org/v40/i01/."))),
+            tags$li(tags$span(HTML("<span style='color:blue'>processx</span>"), p("Csárdi G, Chang W (2026). _processx: Execute and Control System Processes_. URL: https://doi.org/10.32614/CRAN.package.processx."))),
             tags$li(tags$span(HTML("<span style='color:blue'>proxy</span>"), p("Meyer D, Buchta C (2022). _proxy: Distance and Similarity Measures_. URL: https://doi:10.32614/CRAN.package.proxy."))),
             tags$li(tags$span(HTML("<span style='color:blue'>readr</span>"), p("Wickham H, Hester J, Bryan J (2023). _readr: Read Rectangular Text Data_. URL: https://CRAN.R-project.org/package=readr."))),
             tags$li(tags$span(HTML("<span style='color:blue'>rnaturalearth</span>"), p("Massicotte P, South A (2023). _rnaturalearth: World Map Data from Natural Earth_. URL: https://CRAN.R-project.org/package=rnaturalearth."))),
@@ -1601,42 +1601,50 @@ server <- function(input, output, session)
   dir.create(tempDir, showWarnings = FALSE, recursive = TRUE)
   Sys.setenv(TMPDIR = tempDir)
 
+  stop_if_running <- function(bg)
+  {
+    if (is.null(bg))
+      return(invisible(NULL))
+
+    try(
+    {
+      if (bg$is_alive())
+        bg$kill()
+
+      # Wacht tot processx de beëindiging heeft verwerkt.
+      bg$wait(timeout = 5000)
+    }, silent = TRUE)
+
+    invisible(NULL)
+  }
+
   session$onSessionEnded(function()
   {
-    if (dir.exists(tempDir))
-    {
-      unlink(tempDir, recursive = TRUE, force = TRUE)
-    }
-  })
-
-  onStop(function() 
-  {
-    if (dir.exists(tempDir)) 
-    {
-      unlink(tempDir, recursive = TRUE, force = TRUE)
-    }
-  })
-
-  session$onSessionEnded(function()
-  {
-    for (nm in c("background", "background6")) 
+    for (nm in c("background", "background6"))
     {
       bg <- isolate(global[[nm]])
       
-      if (!is.null(bg)) 
+      if (!is.null(bg))
       {
-        try(bg$kill(), silent = TRUE)
+        stop_if_running(bg)
         global[[nm]] <- NULL
-        cat(sprintf("Killed %s on session end.\n", nm))
+        
+        cat(sprintf(
+          "Stopped %s on session end.\n",
+          nm
+        ))
       }
     }
+    
+    if (dir.exists(tempDir))
+    {
+      unlink(
+        tempDir,
+        recursive = TRUE,
+        force = TRUE
+      )
+    }
   })
-
-  stop_if_running <- function(bg) 
-  {
-    if (!is.null(bg)) 
-      try(bg$kill(), silent = TRUE)
-  }
 
   ##############################################################################
   
@@ -2724,27 +2732,26 @@ server <- function(input, output, session)
 
     Levenshtein1 <- function()
     {
-      saveIn  <- "1"
-      saveAg  <- "1"
-
-      System2 <- function(saveIn, saveAg, tempDir)
-      {
-        system2(
-          command = "./leven1",
-          args    = c("names.txt", "files.txt", "items.txt", saveIn, saveAg, tempDir),
-          stdout  = TRUE,
-          stderr  = TRUE
-        )
-      }
+      saveIn <- "1"
+      saveAg <- "1"
 
       stop_if_running(global$background)
-      global$background <- r_bg(
-        func      = System2,
-        args      = list(saveIn, saveAg, tempDir),
-        supervise = TRUE
+
+      global$background <- processx::process$new(
+        command = "./leven1",
+        args = c(
+          "names.txt",
+          "files.txt",
+          "items.txt",
+          saveIn,
+          saveAg,
+          tempDir
+        ),
+        stdout = NULL,
+        stderr = NULL
       )
     }
-
+    
     # Calculate Levenshtein distances
 
     Levenshtein2 <- function()
@@ -2786,21 +2793,26 @@ server <- function(input, output, session)
         saveIn  <- "1"
         saveAg  <- "1"
 
-      System2 <- function(levMeth, normAli, selPart, saveSO, saveAl, saveIn, saveAg, tempDir)
-      {
-        system2(
-          command = "./leven2",
-          args    = c("names.txt", "files.txt", "items.txt", "sounddists.txt", levMeth, normAli, selPart, saveSO, saveAl, saveIn, saveAg, tempDir),
-          stdout  = TRUE,
-          stderr  = TRUE
-        )
-      }
-
       stop_if_running(global$background)
-      global$background <- r_bg(
-        func      = System2,
-        args      = list(levMeth, normAli, selPart, saveSO, saveAl, saveIn, saveAg, tempDir),
-        supervise = TRUE
+
+      global$background <- processx::process$new(
+        command = "./leven2",
+        args = c(
+          "names.txt",
+          "files.txt",
+          "items.txt",
+          "sounddists.txt",
+          levMeth,
+          normAli,
+          selPart,
+          saveSO,
+          saveAl,
+          saveIn,
+          saveAg,
+          tempDir
+        ),
+        stdout = NULL,
+        stderr = NULL
       )
     }
 
@@ -2813,18 +2825,21 @@ server <- function(input, output, session)
   observe(
   {
     req(global$background)
-    status <- global$background$poll_io(0)["process"]
-
-    if  (status == "timeout")
-      invalidateLater(1000)
-
-    if ((status == "ready") & !global$finished)
+    
+    if (global$background$is_alive())
     {
-      messages <- global$background$get_result()
-
-      if (length(messages)>0)
+      invalidateLater(1000)
+      return()
+    }
+    
+    if (!global$finished)
+    {
+      exit_status <- global$background$get_exit_status()
+      
+      if (!identical(exit_status, 0L))
       {
-        showNotification(HTML(paste(messages, sep = "", collapse = "<br>")), type = "message", duration = NULL)
+        messages <- paste("Background process exited with status", exit_status)  
+        showNotification(HTML(messages), type = "message", duration = NULL)
       }
 
       # Calculate Cronbach's α
@@ -6933,6 +6948,42 @@ server <- function(input, output, session)
     updateNumericInput(session = session, inputId = 'clusPar6', value = isolate(global$clusPar6))
   )
 
+  FinishPartition <- function()
+  {
+    removeNotification(global$idNot)
+    
+    if (file.exists(paste0(tempDir, "partition.csv")))
+      global$partition <- read.csv(paste0(tempDir, "partition.csv"), header = FALSE, quote = "")
+    else
+      return(NULL)
+    
+    nAll    <- nrow(global$partition)
+    nClass  <- length(global$partition$V1[global$partition$V1 > 0])
+    nGroups <- max(global$partition$V1)
+    
+    showNotification(paste(nClass, "varieties out of", nAll, "are classified into", nGroups, "groups."), type = "message", duration = NULL)
+    
+    evp <- explained_variance_permanova(as.dist(aggrMat()), global$partition$V1, 0)
+    explVar <- formatC(x = round2(evp * 100, n = 1), digits = 1, format = "f")
+    
+    if (input$replyMethod6 != "HDBSCAN")
+      contentOfMessage <- paste0("Adjusted variance explained by ", global$replyMethod31, " with ", input$replyMethod6, ": ", explVar, "%.")
+    else
+      contentOfMessage <- paste0("Adjusted variance explained by ", input$replyMethod6, ": ", explVar, "%.")
+    
+    showNotification(contentOfMessage, type = "message", duration = NULL)
+    
+    insertUI(
+      selector = "#goButton",
+      where    = "afterEnd",
+      ui       = tags$audio(src = "ready.mp3", type = "audio/mp3", autoplay = T, controls = NA, style = "display:none;")
+    )
+    
+    showNotification("Ready!", type = "message", duration = NULL)
+    
+    global$finished6 <- TRUE
+  }
+
   observeEvent(input$goButton6,
   {
     req(global$finished)
@@ -6995,12 +7046,8 @@ server <- function(input, output, session)
       )
 
       write_csv(df, paste0(tempDir, "partition.csv"), col_names = F)
-      
-      stop_if_running(global$background6)
-      global$background6 <- r_bg(
-        func      = function(){return(NULL)},
-        supervise = TRUE
-      )
+
+      FinishPartition()
     }
 
     Partition2 <- function()
@@ -7033,11 +7080,7 @@ server <- function(input, output, session)
 
       write_csv(df, paste0(tempDir, "partition.csv"), col_names = F)
       
-      stop_if_running(global$background6)
-      global$background6 <- r_bg(
-        func      = function(){return(NULL)},
-        supervise = TRUE
-      )
+      FinishPartition()
     }
 
     Partition3 <- function()
@@ -7081,21 +7124,21 @@ server <- function(input, output, session)
       if (file.exists(paste0(   tempDir, "partition.csv")))
         system(paste0("rm -f ", tempDir, "partition.csv"))
 
-      System2 <- function(methodc, methodr, numIter, tempDir)
-      {
-        system2(
-          command = "./robust",
-          args    = c("files.txt", "items.txt", "individual.tsv", methodc, methodr, numIter, tempDir),
-          stdout  = TRUE,
-          stderr  = TRUE
-        )
-      }
-
       stop_if_running(global$background6)
-      global$background6 <- r_bg(
-        func      = System2,
-        args      = list(methodc, methodr, input$numIter6, tempDir),
-        supervise = TRUE
+      
+      global$background6 <- processx::process$new(
+        command = "./robust",
+        args = c(
+          "files.txt",
+          "items.txt",
+          "individual.tsv",
+          as.character(methodc),
+          as.character(methodr),
+          as.character(input$numIter6),
+          tempDir
+        ),
+        stdout = NULL,
+        stderr = NULL
       )
     }
 
@@ -7118,51 +7161,29 @@ server <- function(input, output, session)
   observe(
   {
     req(global$background6)
-    status <- global$background6$poll_io(0)["process"]
-
-    if  (status == "timeout")
-      invalidateLater(1000)
-
-    if ((status == "ready") & !global$finished6)
+      
+    if (global$background6$is_alive())
     {
-      messages <- global$background6$get_result()
-
-      if (length(messages)>0)
+      invalidateLater(1000)
+      return()
+    }
+      
+    if (!global$finished6)
+    {
+      exit_status <- global$background6$get_exit_status()
+        
+      if (!identical(exit_status, 0L))
       {
-        showNotification(HTML(paste(messages, sep = "", collapse = "<br>")), type = "message", duration = NULL)
+        messages <- paste("Background process exited with status", exit_status)
+        showNotification(HTML(messages), type = "message", duration = NULL)
+          
+        global$finished6   <- TRUE
+        global$background6 <- NULL
+        return()
       }
-
-      removeNotification(global$idNot)
-
-      if (file.exists(paste0(tempDir, "partition.csv")))
-        global$partition <- read.csv(paste0(tempDir, "partition.csv"), header = FALSE, quote="")
-      else
-        return(NULL)
+        
+      FinishPartition()
       
-      nAll    <- nrow(global$partition)
-      nClass  <- length(global$partition$V1[global$partition$V1>0])
-      nGroups <- max(global$partition$V1)
-
-      showNotification(paste(nClass, "varieties out of", nAll, "are classified into", nGroups, "groups."), type = "message", duration = NULL)
-
-      evp <- explained_variance_permanova(as.dist(aggrMat()), global$partition$V1, 0)
-      explVar <- formatC(x=round2(evp * 100, n=1), digits = 1, format = "f")
-
-      if (input$replyMethod6!="HDBSCAN")
-        contentOfMessage <- paste0("Adjusted variance explained by ", global$replyMethod31, " with ", input$replyMethod6, ": ", explVar, "%.")
-      else
-        contentOfMessage <- paste0("Adjusted variance explained by ", input$replyMethod6, ": ", explVar, "%.")
-      
-      showNotification(contentOfMessage, type = "message", duration = NULL)                     
-
-      insertUI(
-        selector = "#goButton",
-        where    = "afterEnd",
-        ui       = tags$audio(src = "ready.mp3", type = "audio/mp3", autoplay = T, controls = NA, style="display:none;")
-      )
-
-      showNotification("Ready!", type = "message", duration = NULL)
-      global$finished6   <- TRUE
       global$background6 <- NULL
     }
   })
