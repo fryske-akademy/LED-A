@@ -15,29 +15,39 @@ Read from file: wave_file$
 Rename: "wavefile"
 
 if removesilence$="yes"
-  To TextGrid (speech activity): 0, 0.3, 0.1, 70, 6000, -10, -35, 0.1, 0.1, "", "speech"
+  To TextGrid (speech activity, Silero): 0.5, 0.1, 0.25, 0.03, "", "speech"
   Rename: "textgrid"
 
-  selectObject: "TextGrid textgrid"
-  Get starting points: 1, "is equal to", "speech"
-  starttime = Get time from index: 1
+  n = Get number of intervals: 1
 
-  selectObject: "TextGrid textgrid"
-  Get end points: 1, "is equal to", "speech"
-  nop = Get number of points
-  endtime = Get time from index: nop
+  hasSpeech = 0
 
-  selectObject: "Sound wavefile"
-  Extract part: starttime, endtime, "rectangular", 1, "no"
+  for i from 1 to n
+    label$ = Get label of interval: 1, i
 
-  selectObject: "Sound wavefile"
-  Remove
+    if label$ = "speech"
+      hasSpeech = 1
+    endif
+  endfor
 
-  selectObject: "Sound wavefile_part"
-  Rename: "wavefile"
+  if hasSpeech = 1
+    selectObject: "Sound wavefile"
+    plusObject: "TextGrid textgrid"
+  
+    Extract intervals where: 1, "no", "is equal to", "speech"
+    Concatenate
+
+    selectObject: "Sound wavefile"
+    Remove
+
+    selectObject: "Sound chain"
+    Rename: "wavefile"
+  endif
 endif
 
 if changegender$="yes"
+  selectObject: "Sound wavefile"
+
   To Pitch: 0, 75, 600
   pitch_mean  = Get mean: 0, 0, "Hertz"
   pitch_mean$ = Get mean: 0, 0, "Hertz"
