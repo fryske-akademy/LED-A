@@ -2034,6 +2034,19 @@ server <- function(input, output, session)
     )
   })
 
+  emptyDir <- function(tempDir)
+  {
+    files_to_remove <- list.files(
+      path       = tempDir,
+      full.names = TRUE,
+      all.files  = TRUE,
+      no..       = TRUE
+    )
+    
+    if (length(files_to_remove) > 0)
+      unlink(files_to_remove, recursive = TRUE, force = TRUE)
+  }
+
   observeEvent(input$goButton,
   {
     global$dataType   <- input$navBar
@@ -2041,8 +2054,8 @@ server <- function(input, output, session)
     global$background <- NULL
     global$partition  <- NULL
 
-    gc();
-    system(paste0("rm -Rf ", tempDir, "*"))
+    gc()
+    emptyDir(tempDir)
 
     # check inputs
 
@@ -2285,13 +2298,21 @@ server <- function(input, output, session)
       else
         diacritics <- 0
 
-      messages <- system2(
-        command = "./phon",
-        args    = c("names.txt files.txt", "items.txt", length, diacritics, tempDir),
-        stdout  = TRUE,
-        stderr  = TRUE
+      result <- processx::run(
+        command         = "./phon",
+        args            = c("names.txt", "files.txt", "items.txt", as.character(length), as.character(diacritics), tempDir),
+        stdout          = "|",
+        stderr          = "|",
+        error_on_status = FALSE
       )
-
+      
+      messages <- c(
+        strsplit(result$stdout, "\n", fixed = TRUE)[[1]],
+        strsplit(result$stderr, "\n", fixed = TRUE)[[1]]
+      )
+      
+      messages <- messages[nzchar(messages)]
+      
       if (length(messages)>0)
       {
         showNotification(HTML(paste(messages, sep = "", collapse = "<br>")), type = "error", duration = NULL)
@@ -2739,16 +2760,9 @@ server <- function(input, output, session)
 
       global$background <- processx::process$new(
         command = "./leven1",
-        args = c(
-          "names.txt",
-          "files.txt",
-          "items.txt",
-          saveIn,
-          saveAg,
-          tempDir
-        ),
-        stdout = NULL,
-        stderr = NULL
+        args    = c("names.txt", "files.txt", "items.txt", saveIn, saveAg, tempDir),
+        stdout  = NULL,
+        stderr  = NULL
       )
     }
     
@@ -2796,23 +2810,10 @@ server <- function(input, output, session)
       stop_if_running(global$background)
 
       global$background <- processx::process$new(
-        command = "./leven2",
-        args = c(
-          "names.txt",
-          "files.txt",
-          "items.txt",
-          "sounddists.txt",
-          levMeth,
-          normAli,
-          selPart,
-          saveSO,
-          saveAl,
-          saveIn,
-          saveAg,
-          tempDir
-        ),
-        stdout = NULL,
-        stderr = NULL
+        command = "./leven2", 
+        args    = c("names.txt", "files.txt", "items.txt", "sounddists.txt", levMeth, normAli, selPart, saveSO, saveAl, saveIn, saveAg, tempDir),
+        stdout  = NULL,
+        stderr  = NULL
       )
     }
 
@@ -2844,12 +2845,20 @@ server <- function(input, output, session)
 
       # Calculate Cronbach's α
 
-      messages <- system2(
-        command = "./cron",
-        args    = c("files.txt", "items.txt", "individual.tsv", tempDir),
-        stdout  = TRUE,
-        stderr  = TRUE
+      result <- processx::run(
+        command         = "./cron",
+        args            = c("files.txt", "items.txt", "individual.tsv", tempDir),
+        stdout          = "|",
+        stderr          = "|",
+        error_on_status = FALSE
       )
+      
+      messages <- c(
+        strsplit(result$stdout, "\n", fixed = TRUE)[[1]],
+        strsplit(result$stderr, "\n", fixed = TRUE)[[1]]
+      )
+      
+      messages <- messages[nzchar(messages)]
 
       removeNotification(global$idNot)
       
@@ -3271,7 +3280,6 @@ server <- function(input, output, session)
       global$idNot <- showNotification(HTML(paste0("Checking sample rates, ", round((i/length(varieties))*100), "% done.")), type = "message", duration = NULL)
     }
     
-    cat("Sample rate: ", minSampleRate, "\n")
     global$sampleRate <- minSampleRate     
   }
 
@@ -3311,6 +3319,29 @@ server <- function(input, output, session)
       showNotification(HTML(paste0("The duration of sound file ", s, " is too short, it will be skipped!")), type = "message", duration = NULL)
   }
 
+  run_praat <- function(s0, tempDir, arg3, arg4)
+  {
+    result <- processx::run(
+      command         = "./praat",
+      args            = c("--run", "gender.praat", s0, tempDir, arg3, arg4),
+      stdout          = "|",
+      stderr          = "|",
+      error_on_status = FALSE
+    )
+    
+    if (result$status != 0) 
+    {
+      cat(
+        "Praat failed for:", s0,
+        "\nStatus:", result$status,
+        "\nStderr:", result$stderr,
+        "\n"
+      )
+    }
+    
+    invisible(result)
+  }
+
   filePrep <- function(varieties, items, genNum)
   {
     for (i in 1:length(varieties))
@@ -3333,12 +3364,12 @@ server <- function(input, output, session)
           {
             if (input$trim)
             {
-              system(paste('./praat --run gender.praat', s0, tempDir, "yes", "yes"))
+              run_praat(s0, tempDir, "yes", "yes")
               s0 <- paste0(tempDir, "tmp.wav")
             }
             else
             {
-              system(paste('./praat --run gender.praat', s0, tempDir, "no" , "yes"))
+              run_praat(s0, tempDir, "no", "yes")
               s0 <- paste0(tempDir, "tmp.wav")
             }
           }
@@ -3346,7 +3377,7 @@ server <- function(input, output, session)
           {
             if (input$trim)
             {
-              system(paste('./praat --run gender.praat', s0, tempDir, "yes", "no" ))
+              run_praat(s0, tempDir, "yes", "no")
               s0 <- paste0(tempDir, "tmp.wav")
             }
             else {}
@@ -3502,7 +3533,7 @@ server <- function(input, output, session)
     global$finished  <- FALSE
     global$partition <- NULL
 
-    system(paste0("rm -Rf ", tempDir, "*"))
+    emptyDir(tempDir)
     
     # check inputs
     
@@ -3588,13 +3619,21 @@ server <- function(input, output, session)
     
     # Calculate Cronbach's α
     
-    messages <- system2(
-      command = "./cron",
-      args    = c("files.txt", "items.txt", "individual.tsv", tempDir),
-      stdout  = TRUE,
-      stderr  = TRUE
+    result <- processx::run(
+      command         = "./cron",
+      args            = c("files.txt", "items.txt", "individual.tsv", tempDir),
+      stdout          = "|",
+      stderr          = "|",
+      error_on_status = FALSE
     )
     
+    messages <- c(
+      strsplit(result$stdout, "\n", fixed = TRUE)[[1]],
+      strsplit(result$stderr, "\n", fixed = TRUE)[[1]]
+    )
+    
+    messages <- messages[nzchar(messages)]
+
     removeNotification(global$idNot)
     
     if (length(messages)>0)
@@ -4018,7 +4057,7 @@ server <- function(input, output, session)
     global$finished  <- FALSE
     global$partition <- NULL
 
-    system(paste0("rm -Rf ", tempDir, "*"))
+    emptyDir(tempDir)
     
     # check inputs
     
@@ -4156,7 +4195,7 @@ server <- function(input, output, session)
     global$distTab   <- NULL
     global$partition <- NULL
     
-    system(paste0("rm -Rf ", tempDir, "*"))
+    emptyDir(tempDir)
     
     # check inputs
     
@@ -6619,11 +6658,8 @@ server <- function(input, output, session)
             list("zoomControl" = FALSE)
           )
           
-          #
-          # Add the local OpenFreeMap/MapLibre files
-          # explicitly to the standalone widget.
-          #
-          
+          # Add the local OpenFreeMap/MapLibre files explicitly to the standalone widget.
+
           ofmDependency <- htmltools::htmlDependency(
             name    = "openfreemap-leda",
             version = "1.0.0",
@@ -6644,10 +6680,8 @@ server <- function(input, output, session)
             list(ofmDependency)
           )
           
-          #
           # Save temporary HTML
-          #
-          
+
           tmp5 <- paste0(
             tempDir,
             "map.html"
@@ -6659,13 +6693,9 @@ server <- function(input, output, session)
             selfcontained = FALSE
           )
           
-          #
           # Take screenshot.
-          #
-          # MapLibre needs time to load and render
-          # the vector tiles.
-          #
-          
+          # MapLibre needs time to load and render the vector tiles.
+
           webshot2::webshot(
             url      = tmp5,
             file     = file,
@@ -7032,11 +7062,18 @@ server <- function(input, output, session)
       write_tsv(df, file = paste0(tempDir, "individual.tsv"), col_names = T, quote = "none", escape = "none")
     }
 
+    deleteFile <- function(fileName)
+    {
+      filePath <- file.path(tempDir, fileName)
+      
+      if (file.exists(filePath))
+        unlink(filePath)
+    }
+    
     Partition1 <- function()
     {
-      if (file.exists(paste0(   tempDir, "partition.csv")))
-        system(paste0("rm -f ", tempDir, "partition.csv"))
-
+      deleteFile("partition.csv")
+      
       if (input$replyMethod6=="Largest gap method")
         partition <- cutree(clusObj3(), nGroups(clusObj3()))
 
@@ -7054,8 +7091,7 @@ server <- function(input, output, session)
     {
       setClusPar()
       
-      if (file.exists(paste0(   tempDir, "partition.csv")))
-        system(paste0("rm -f ", tempDir, "partition.csv"))
+      deleteFile("partition.csv")
 
       if (global$clusPar6 < 2) global$clusPar6 <- 2
 
@@ -7121,24 +7157,15 @@ server <- function(input, output, session)
         methodr <- 2
       else {}
 
-      if (file.exists(paste0(   tempDir, "partition.csv")))
-        system(paste0("rm -f ", tempDir, "partition.csv"))
+      deleteFile("partition.csv")
 
       stop_if_running(global$background6)
       
       global$background6 <- processx::process$new(
         command = "./robust",
-        args = c(
-          "files.txt",
-          "items.txt",
-          "individual.tsv",
-          as.character(methodc),
-          as.character(methodr),
-          as.character(input$numIter6),
-          tempDir
-        ),
-        stdout = NULL,
-        stderr = NULL
+        args    = c("files.txt", "items.txt", "individual.tsv", as.character(methodc), as.character(methodr), as.character(input$numIter6), tempDir),
+        stdout  = NULL,
+        stderr  = NULL
       )
     }
 
@@ -7415,11 +7442,8 @@ server <- function(input, output, session)
             list("zoomControl" = FALSE)
           )
           
-          #
-          # Add the local OpenFreeMap/MapLibre files
-          # explicitly to the standalone widget.
-          #
-          
+          # Add the local OpenFreeMap/MapLibre files explicitly to the standalone widget.
+
           ofmDependency <- htmltools::htmlDependency(
             name    = "openfreemap-leda",
             version = "1.0.0",
@@ -7440,10 +7464,8 @@ server <- function(input, output, session)
             list(ofmDependency)
           )
           
-          #
           # Save temporary HTML
-          #
-          
+
           tmp6 <- paste0(
             tempDir,
             "map.html"
@@ -7455,13 +7477,9 @@ server <- function(input, output, session)
             selfcontained = FALSE
           )
           
-          #
           # Take screenshot.
-          #
-          # MapLibre needs time to load and render
-          # the vector tiles.
-          #
-          
+          # MapLibre needs time to load and render the vector tiles.
+
           webshot2::webshot(
             url      = tmp6,
             file     = file,
